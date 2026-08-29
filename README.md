@@ -1,59 +1,56 @@
-# Holstein–Peierls Transport
+# holstein-peierls-transport
 
-Modern Python implementation of a semiclassical Holstein–Peierls model for charge transport in two-dimensional molecular organic semiconductors.
+Modern, reproducible implementation of the semiclassical two-dimensional
+Holstein-Peierls model used to study polaron formation and charge transport in
+molecular organic semiconductors.
 
-## Scope
+## Status
 
-The project is being modernized from a legacy Fortran workflow. Development is intentionally split into two scientific stages:
+The current `0.1.0a1` implementation covers **static polaron formation only**. It
+reproduces the structure and historical update rules of the archived
+`rprop.f90` program before performance optimizations or GPU support are added.
+The dynamical `hp2D.f90` workflow will be migrated only after the static solver
+has passed numerical regression tests against legacy outputs.
 
-1. **Static polaron solver** — simultaneous convergence of the excess-charge ground state and lattice deformation using RPROP.
-2. **Polaron dynamics** — time propagation of the electronic wavefunction and classical lattice degrees of freedom, including external electric fields and later extensions for disorder and temperature.
+## Scientific model
 
-The first implementation milestone is a numerically faithful CPU reference version of the static solver. Performance optimizations, sparse eigensolvers, multithreading, and GPU acceleration will be introduced only after regression tests against the legacy implementation are established.
+The static calculation couples one electronic state per molecular site to three
+classical lattice coordinates per site: the intramolecular Holstein coordinate
+`u` and two intermolecular Peierls coordinates `vx` and `vy`. Periodic boundary
+conditions are used in both lattice directions. The lattice is relaxed with the
+RPROP algorithm while the electronic state is kept in the instantaneous ground
+state.
 
-## Legacy archive
+Key references underlying the archived implementation include:
 
-The original Fortran sources and reconstructed legacy input parameter sets are preserved in the project Google Drive under:
+- E. Mozafari and S. Stafstrom, *Physics Letters A* **376**, 1807-1811 (2012).
+- E. Mozafari and S. Stafstrom, *Journal of Chemical Physics* **138**, 184104 (2013).
+- E. Mozafari, *A Theoretical Study of Charge Transport in Molecular Crystals*, Linkoping University (2012).
 
-`CODIGOS/holstein-peierls-transport/legacy/`
+## Reproducibility policy
 
-The Drive archive contains SHA-256 checksums and is treated as immutable reference material. Original legacy files must not be edited in place.
+The original Fortran source and generated include files are archived separately
+in Google Drive under `CODIGOS/holstein-peierls-transport/legacy`. They are not
+silently edited. Historical behaviours that may look unusual are represented in
+an explicit compatibility path and documented before any modernized alternative
+is introduced.
 
-## Development principles
+## Development stages
 
-- Scientific code, documentation, variable names, and comments are written in English.
-- Physics and numerical algorithms are kept modular and independently testable.
-- Every scientific change is validated against the legacy reference or published benchmarks.
-- CPU and GPU implementations must share the same high-level solver API.
-- Reproducible runs record parameters, software version, Git commit, numerical backend, and hardware information.
-- Publication results will be tied to tagged releases and archived input/output datasets.
+1. Static CPU reference solver and legacy regression tests.
+2. CPU optimization, sparse/operator formulation, and parameter sweeps.
+3. Optional GPU backend.
+4. Time-dependent polaron dynamics.
+5. Disorder, finite temperature, transport observables, and publication-grade workflows.
 
-## Planned package layout
+## Quick start
 
-```text
-src/holstein_peierls/
-    parameters.py
-    lattice.py
-    hamiltonian.py
-    energy.py
-    gradients.py
-    rprop.py
-    polaron.py
-    observables.py
-    io.py
-    plotting.py
-    backends/
-        numpy_backend.py
-        cupy_backend.py
-
-tests/
-examples/
-benchmarks/
-docs/
+```bash
+python -m pip install -e .
+hp-polaron --parameters parameters1.inc --solver dense_lowest --output run-static
 ```
 
-## Current status
-
-**Phase 0 — legacy audit and scientific specification.**
-
-The complete legacy workflow has been identified and archived. The next milestone is the CPU reference implementation of the static RPROP polaron solver together with regression and physics tests.
+Use `--solver dense_full` for the closest numerical analogue of the full LAPACK
+diagonalization used by `rprop.f90`. The modern default requires `u`, `vx`, and
+`vy` to converge. Use `--legacy-convergence` only for regression against the
+historical `u`-only stopping rule.
