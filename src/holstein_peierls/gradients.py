@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -11,36 +13,40 @@ from .lattice import LatticeState
 from .parameters import StaticPolaronParameters
 
 FloatArray = NDArray[np.float64]
+GradientMode = Literal["reference", "optimized"]
 
 
 @dataclass(frozen=True, slots=True)
 class LatticeGradient:
+    """Energy derivatives with respect to the three lattice coordinates."""
+
     u: FloatArray
     vx: FloatArray
     vy: FloatArray
 
     @property
     def maximum_absolute_component(self) -> float:
-        return float(max(np.max(np.abs(self.u)), np.max(np.abs(self.vx)), np.max(np.abs(self.vy))))
+        return float(
+            max(
+                np.max(np.abs(self.u)),
+                np.max(np.abs(self.vx)),
+                np.max(np.abs(self.vy)),
+            )
+        )
 
 
-def energy_gradient(
+def _reference_gradient(
     state: LatticeState,
     parameters: StaticPolaronParameters,
-    *,
-    solver: SolverName = "dense_lowest",
-    ground_state: GroundState | None = None,
-) -> tuple[LatticeGradient, GroundState]:
-    """Evaluate the lattice-energy gradient using legacy arithmetic ordering.
+    ground_state: GroundState,
+) -> LatticeGradient:
+    """Evaluate the legacy-ordered gradient for regression calculations.
 
-    RPROP depends only on derivative signs. At symmetric sites, algebraically
-    equivalent simplifications can alter signs of round-off-level derivatives,
-    so the reference path preserves the density matrix, loops, and expression
-    ordering of ``gradientenergy`` in the archived Fortran source.
+    This path intentionally preserves the full density matrix, explicit loops,
+    and arithmetic ordering of ``gradientenergy`` in the archived Fortran code.
+    RPROP depends on derivative signs, so this implementation remains available
+    whenever strict historical regression is more important than performance.
     """
-    if ground_state is None:
-        ground_state = solve_ground_state(state, parameters, solver=solver)
-
     ny, nx = state.shape
     nxy = parameters.n_sites
     psi = np.asarray(ground_state.wavefunction, dtype=np.float64)
@@ -115,4 +121,88 @@ def energy_gradient(
         grad_u.reshape(shape, order="C"),
         grad_vx.reshape(shape, order="C"),
         grad_vy.reshape(shape, order="C"),
-    ), ground_state
+    )
+
+
+def _optimized_gradient(
+    state: LatticeState,
+    parameters: StaticPolaronParameters,
+    ground_state: GroundState,
+) -> LatticeGradient:
+    """Evaluate the same analytical gradient with O(N) storage and vector math.
+
+    The legacy implementation builds the full density matrix
+    ``rho[i, j] = psi[i] * psi[j]`` even though only diagonal and nearest-neighbour
+    elements are used. For a real one-particle ground state, the electronic
+    parts reduce exactly to local products of the wavefunction:
+
+    ``rho[i,left] + rho[left,i] - rho[right,i] - rho[i,right]``
+    ``= 2 * psi[i] * (psi[left] - psi[right])``.
+
+    This path therefore requires only O(N) temporary storage instead of O(N^2).
+    """
+    psi = np.asarray(ground_state.wavefunction, dtype=np.float64).reshape(
+        state.shape, order="C"
+    )
+
+    psi_left = np.roll(psi, shift=1, axis=1)
+    psi_right = np.roll(psi, shift=-1, axis=1)
+    psi_up = np.roll(psi, shift=1, axis=0)
+    psi_down = np.roll(psi, shift=-1, axis=0)
+
+    vx_left = np.roll(state.vx, shift=1, axis=1)
+    vx_right = np.roll(state.vx, shift=-1, axis=1)
+    vy_up = np.roll(state.vy, shift=1, axis=0)
+    vy_down = np.roll(state.vy, shift=-1, axis=0)
+
+    grad_u = parameters.k1 * state.u + parameters.alpha_intra * np.square(psi)
+    grad_vx = (
+        parameters.k2 * (2.0 * state.vx - vx_left - vx_right)
+        + 2.0
+        * parameters.alpha_interx
+        * psi
+        * (psi_left - psi_right)
+    )
+    grad_vy = (
+        parameters.k2 * (2.0 * state.vy - vy_up - vy_down)
+        + 2.0
+        * parameters.alpha_intery
+        * psi
+        * (psi_up - psi_down)
+    )
+
+    return LatticeGradient(
+        np.asarray(grad_u, dtype=np.float64),
+        np.asarray(grad_vx, dtype=np.float64),
+        np.asarray(grad_vy, dtype=np.float64),
+    )
+
+
+def energy_gradient(
+    state: LatticeState,
+    parameters: StaticPolaronParameters,
+    *,
+    solver: SolverName = "dense_lowest",
+    ground_state: GroundState | None = None,
+    mode: GradientMode = "optimized",
+) -> tuple[LatticeGradient, GroundState]:
+    """Evaluate the lattice-energy gradient.
+
+    Parameters
+    ----------
+    mode:
+        ``"optimized"`` uses O(N) storage and vectorized nearest-neighbour
+        products. ``"reference"`` preserves the historical density-matrix and
+        loop ordering for strict regression against the archived Fortran code.
+    """
+    if ground_state is None:
+        ground_state = solve_ground_state(state, parameters, solver=solver)
+
+    if mode == "optimized":
+        gradient = _optimized_gradient(state, parameters, ground_state)
+    elif mode == "reference":
+        gradient = _reference_gradient(state, parameters, ground_state)
+    else:
+        raise ValueError(f"unknown gradient mode: {mode}")
+
+    return gradient, ground_state
