@@ -17,6 +17,12 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("run-static"))
     parser.add_argument("--input-dir", type=Path)
     parser.add_argument("--solver", choices=("dense_full", "dense_lowest", "sparse"), default="dense_lowest")
+    parser.add_argument(
+        "--gradient",
+        choices=("optimized", "reference"),
+        default="optimized",
+        help="Use the O(N) optimized gradient or the historical density-matrix path.",
+    )
     parser.add_argument("--legacy-convergence", action="store_true")
     parser.add_argument("--no-legacy-seed", action="store_true")
     args = parser.parse_args()
@@ -32,6 +38,7 @@ def main() -> None:
         parameters,
         initial_state=initial_state,
         solver=args.solver,
+        gradient_mode=args.gradient,
         legacy_convergence=args.legacy_convergence,
         apply_legacy_seed=not args.no_legacy_seed,
     )
@@ -44,6 +51,7 @@ def main() -> None:
         "program": "holstein-peierls-transport",
         "version": __version__,
         "solver": args.solver,
+        "gradient_mode": args.gradient,
         "legacy_convergence": args.legacy_convergence,
         "parameters": parameters.to_dict(),
         "results": {

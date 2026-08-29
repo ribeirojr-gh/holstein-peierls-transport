@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "holstein-peierls-transport"
-version = "0.1.0a1"
-description = "Reference implementation of a two-dimensional Holstein-Peierls polaron model."
+version = "0.2.0a1"
+description = "Reference and optimized CPU implementation of a two-dimensional Holstein-Peierls polaron model."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [

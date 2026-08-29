@@ -1,4 +1,4 @@
-"""Resilient backpropagation minimizer with an explicit legacy-compatibility mode."""
+"""Resilient backpropagation minimizer with explicit compatibility controls."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ from typing import Callable
 import numpy as np
 from numpy.typing import NDArray
 
-from .electronic import GroundState, SolverName
+from .electronic import GroundState, SolverName, solve_ground_state
 from .energy import EnergyBreakdown, total_energy
-from .gradients import LatticeGradient, energy_gradient
+from .gradients import GradientMode, LatticeGradient, energy_gradient
 from .lattice import LatticeState
 from .parameters import StaticPolaronParameters
 
@@ -95,10 +95,26 @@ def minimize_legacy_rprop(
     parameters: StaticPolaronParameters,
     *,
     solver: SolverName = "dense_lowest",
+    gradient_mode: GradientMode = "optimized",
     stop_when_all_coordinates_converge: bool = False,
     progress: ProgressCallback | None = None,
 ) -> RPropOutput:
-    """Relax a polaron with the historical RPROP update equations."""
+    """Relax a polaron with the historical RPROP update equations.
+
+    The electronic state evaluated after an RPROP update is cached and reused
+    for the gradient at the beginning of the next iteration. This removes one
+    redundant diagonalization per iteration without changing the mathematical
+    state at which the gradient is evaluated.
+
+    For the sparse eigensolver, the pre-update electronic state is also passed
+    as the iterative starting vector after the lattice step. This provides
+    adiabatic continuity between RPROP iterations and avoids arbitrary switches
+    among translationally equivalent localized states in a periodic lattice.
+
+    ``gradient_mode="reference"`` retains the archived density-matrix arithmetic
+    for strict historical regression. The default ``"optimized"`` path uses
+    only O(N) nearest-neighbour wavefunction products.
+    """
     state = initial_state.copy()
     state.validate()
     shape = state.shape
@@ -108,14 +124,20 @@ def minimize_legacy_rprop(
         "vy": _AxisMemory.create(shape, parameters.update_start),
     }
 
-    total_energy(state, parameters, solver=solver)
     converged_u = converged_vx = converged_vy = False
     final_energy: EnergyBreakdown | None = None
     final_ground_state: GroundState | None = None
+    cached_ground_state: GroundState | None = None
     iterations_done = 0
 
     for iteration in range(1, parameters.max_iterations + 1):
-        gradient, _ = energy_gradient(state, parameters, solver=solver)
+        gradient, gradient_ground_state = energy_gradient(
+            state,
+            parameters,
+            solver=solver,
+            ground_state=cached_ground_state,
+            mode=gradient_mode,
+        )
         current = {
             "u": np.array(gradient.u, copy=True),
             "vx": np.array(gradient.vx, copy=True),
@@ -126,7 +148,19 @@ def minimize_legacy_rprop(
         for name in ("u", "vx", "vy"):
             _legacy_axis_step(values[name], current[name], memories[name], parameters)
 
-        final_energy, final_ground_state = total_energy(state, parameters, solver=solver)
+        final_ground_state = solve_ground_state(
+            state,
+            parameters,
+            solver=solver,
+            initial_wavefunction=gradient_ground_state.wavefunction,
+        )
+        final_energy, _ = total_energy(
+            state,
+            parameters,
+            solver=solver,
+            ground_state=final_ground_state,
+        )
+        cached_ground_state = final_ground_state
         iterations_done = iteration
 
         du = memories["u"].delta
@@ -143,7 +177,12 @@ def minimize_legacy_rprop(
             memory.previous_gradient[...] = current[name]
 
         if progress is not None:
-            progress(iteration, final_energy, state, LatticeGradient(current["u"], current["vx"], current["vy"]))
+            progress(
+                iteration,
+                final_energy,
+                state,
+                LatticeGradient(current["u"], current["vx"], current["vy"]),
+            )
 
         done = (
             converged_u and converged_vx and converged_vy

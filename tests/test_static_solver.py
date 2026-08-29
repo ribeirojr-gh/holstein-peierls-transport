@@ -5,7 +5,7 @@ import numpy as np
 from holstein_peierls.electronic import solve_ground_state
 from holstein_peierls.energy import total_energy
 from holstein_peierls.gradients import energy_gradient
-from holstein_peierls.hamiltonian import build_dense_hamiltonian
+from holstein_peierls.hamiltonian import build_dense_hamiltonian, build_sparse_hamiltonian
 from holstein_peierls.lattice import LatticeState
 from holstein_peierls.parameters import StaticPolaronParameters
 from holstein_peierls.polaron import solve_static_polaron
@@ -25,6 +25,19 @@ def test_hamiltonian_periodic_neighbours_and_signs() -> None:
     assert np.isclose(h[0, 3], -p.j0y + p.alpha_intery * 0.2)
 
 
+def test_direct_sparse_hamiltonian_matches_dense_reference() -> None:
+    p = replace(StaticPolaronParameters(), nx=4, ny=5, polaron_position=7)
+    rng = np.random.default_rng(12)
+    s = LatticeState(
+        u=rng.normal(scale=0.03, size=(5, 4)),
+        vx=rng.normal(scale=0.03, size=(5, 4)),
+        vy=rng.normal(scale=0.03, size=(5, 4)),
+    )
+    dense = build_dense_hamiltonian(s, p)
+    sparse = build_sparse_hamiltonian(s, p).toarray()
+    assert np.array_equal(dense, sparse)
+
+
 def test_analytical_gradient_matches_finite_difference() -> None:
     p = replace(StaticPolaronParameters(), nx=3, ny=3, polaron_position=5, j0y=0.07)
     rng = np.random.default_rng(7)
@@ -33,7 +46,7 @@ def test_analytical_gradient_matches_finite_difference() -> None:
         vx=rng.normal(scale=0.02, size=(3, 3)),
         vy=rng.normal(scale=0.02, size=(3, 3)),
     )
-    gradient, _ = energy_gradient(s, p, solver="dense_full")
+    gradient, _ = energy_gradient(s, p, solver="dense_full", mode="optimized")
     epsilon = 1e-6
     for name, index in (("u", (1, 1)), ("vx", (0, 2)), ("vy", (2, 0))):
         plus, minus = s.copy(), s.copy()
@@ -43,6 +56,26 @@ def test_analytical_gradient_matches_finite_difference() -> None:
         em, _ = total_energy(minus, p, solver="dense_full")
         numerical = (ep.total - em.total) / (2 * epsilon)
         assert np.isclose(getattr(gradient, name)[index], numerical, rtol=3e-6, atol=3e-8)
+
+
+def test_optimized_gradient_matches_reference() -> None:
+    p = replace(StaticPolaronParameters(), nx=5, ny=4, polaron_position=8, j0y=0.07)
+    rng = np.random.default_rng(31)
+    s = LatticeState(
+        u=rng.normal(scale=0.04, size=(4, 5)),
+        vx=rng.normal(scale=0.04, size=(4, 5)),
+        vy=rng.normal(scale=0.04, size=(4, 5)),
+    )
+    ground = solve_ground_state(s, p, solver="dense_full")
+    reference, _ = energy_gradient(
+        s, p, solver="dense_full", ground_state=ground, mode="reference"
+    )
+    optimized, _ = energy_gradient(
+        s, p, solver="dense_full", ground_state=ground, mode="optimized"
+    )
+    assert np.allclose(reference.u, optimized.u, rtol=2e-15, atol=2e-15)
+    assert np.allclose(reference.vx, optimized.vx, rtol=2e-14, atol=2e-15)
+    assert np.allclose(reference.vy, optimized.vy, rtol=2e-14, atol=2e-15)
 
 
 def test_electronic_solvers_agree() -> None:
@@ -67,6 +100,36 @@ def test_converged_legacy_reference() -> None:
         max_iterations=2000,
         convergence_criterion=1e-8,
     )
-    result = solve_static_polaron(p, solver="dense_full", legacy_convergence=True)
+    result = solve_static_polaron(
+        p,
+        solver="dense_full",
+        gradient_mode="reference",
+        legacy_convergence=True,
+    )
     assert np.isclose(result.formation_energy, 0.5864295596422433, atol=2e-13)
     assert np.isclose(np.max(result.charge_density), 0.49634800043158167, atol=3e-8)
+
+
+def test_optimized_and_reference_relaxations_agree() -> None:
+    p = replace(
+        StaticPolaronParameters(),
+        nx=4,
+        ny=4,
+        polaron_position=6,
+        max_iterations=2000,
+        convergence_criterion=1e-8,
+    )
+    reference = solve_static_polaron(
+        p,
+        solver="dense_full",
+        gradient_mode="reference",
+        legacy_convergence=True,
+    )
+    optimized = solve_static_polaron(
+        p,
+        solver="dense_full",
+        gradient_mode="optimized",
+        legacy_convergence=True,
+    )
+    assert np.isclose(reference.formation_energy, optimized.formation_energy, atol=2e-11)
+    assert np.allclose(reference.charge_density, optimized.charge_density, atol=2e-7)
