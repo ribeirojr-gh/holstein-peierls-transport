@@ -6,10 +6,13 @@ singlet Holstein-Hubbard bipolaron in the adiabatic limit.
 """
 
 from .bipolaron import BipolaronGroundState, solve_bipolaron_ground_state
+from .observables import PairObservables, pair_observables
 from .parameters import BipolaronParameters
 
 __all__ = [
     "BipolaronGroundState",
     "BipolaronParameters",
+    "PairObservables",
+    "pair_observables",
     "solve_bipolaron_ground_state",
 ]
