@@ -33,10 +33,19 @@ class GroundState:
 def _normalized_initial_vector(
     initial_wavefunction: FloatArray | None,
     n_sites: int,
+    *,
+    default_index: int,
 ) -> FloatArray:
-    """Return a deterministic normalized starting vector for iterative solvers."""
+    """Return a deterministic normalized starting vector for iterative solvers.
+
+    When no previous electronic state exists, the vector is localized at the
+    same molecular site used by the legacy lattice seed. This removes a purely
+    numerical translational choice from the first sparse diagonalization.
+    """
     if initial_wavefunction is None:
-        return np.full(n_sites, 1.0 / np.sqrt(n_sites), dtype=np.float64)
+        vector = np.zeros(n_sites, dtype=np.float64)
+        vector[default_index] = 1.0
+        return vector
 
     vector = np.asarray(initial_wavefunction, dtype=np.float64).reshape(-1)
     if vector.size != n_sites:
@@ -58,9 +67,9 @@ def solve_ground_state(
 
     ``initial_wavefunction`` is used only by the iterative sparse solver. During
     RPROP relaxation, passing the previous electronic ground state provides an
-    adiabatic warm start. This both reduces eigensolver work and prevents an
-    arbitrary switch between translationally equivalent localized solutions on
-    a periodic lattice.
+    adiabatic warm start. For the first sparse solve, the starting vector is
+    localized at ``polaron_position`` to match the historical lattice seed and
+    make the translational choice deterministic.
     """
     if solver == "dense_full":
         hamiltonian = build_dense_hamiltonian(state, parameters)
@@ -83,7 +92,9 @@ def solve_ground_state(
     elif solver == "sparse":
         hamiltonian = build_sparse_hamiltonian(state, parameters)
         initial_vector = _normalized_initial_vector(
-            initial_wavefunction, parameters.n_sites
+            initial_wavefunction,
+            parameters.n_sites,
+            default_index=parameters.polaron_index,
         )
         eigenvalues, eigenvectors = eigsh(
             hamiltonian,
