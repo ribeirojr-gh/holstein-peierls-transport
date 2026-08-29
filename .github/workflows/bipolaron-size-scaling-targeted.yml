@@ -1,0 +1,44 @@
+name: bipolaron-size-scaling-targeted
+
+on:
+  push:
+    branches: [two-particle-static-theory]
+    paths:
+      - 'experiments/bipolaron_size_scaling.py'
+      - '.github/workflows/bipolaron-size-scaling-targeted.yml'
+  workflow_dispatch:
+
+jobs:
+  targeted-size-scaling:
+    strategy:
+      fail-fast: false
+      matrix:
+        size: [20, 40]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install package
+        run: python -m pip install -e .
+      - name: Run targeted finite-size benchmark
+        run: |
+          python experiments/bipolaron_size_scaling.py \
+            --size ${{ matrix.size }} \
+            --alpha-x 0.100 \
+            --alpha-y 0.120 \
+            --u-values 0.525 1.000 \
+            --max-iterations 1200 \
+            --output bipolaron-size-targeted-${{ matrix.size }}
+      - name: Upload targeted results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bipolaron-size-targeted-${{ matrix.size }}x${{ matrix.size }}
+          path: bipolaron-size-targeted-${{ matrix.size }}/
+          retention-days: 90
