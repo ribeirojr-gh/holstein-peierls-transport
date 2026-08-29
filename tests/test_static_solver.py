@@ -5,7 +5,7 @@ import numpy as np
 from holstein_peierls.electronic import solve_ground_state
 from holstein_peierls.energy import total_energy
 from holstein_peierls.gradients import energy_gradient
-from holstein_peierls.hamiltonian import build_dense_hamiltonian
+from holstein_peierls.hamiltonian import build_dense_hamiltonian, build_sparse_hamiltonian
 from holstein_peierls.lattice import LatticeState
 from holstein_peierls.parameters import StaticPolaronParameters
 from holstein_peierls.polaron import solve_static_polaron
@@ -23,6 +23,19 @@ def test_hamiltonian_periodic_neighbours_and_signs() -> None:
     assert np.isclose(h[0, 1], -p.j0x + p.alpha_interx * 0.1)
     assert np.isclose(h[2, 0], -p.j0x + p.alpha_interx * (0.0 - 0.3))
     assert np.isclose(h[0, 3], -p.j0y + p.alpha_intery * 0.2)
+
+
+def test_direct_sparse_hamiltonian_matches_dense_reference() -> None:
+    p = replace(StaticPolaronParameters(), nx=4, ny=5, polaron_position=7)
+    rng = np.random.default_rng(12)
+    s = LatticeState(
+        u=rng.normal(scale=0.03, size=(5, 4)),
+        vx=rng.normal(scale=0.03, size=(5, 4)),
+        vy=rng.normal(scale=0.03, size=(5, 4)),
+    )
+    dense = build_dense_hamiltonian(s, p)
+    sparse = build_sparse_hamiltonian(s, p).toarray()
+    assert np.array_equal(dense, sparse)
 
 
 def test_analytical_gradient_matches_finite_difference() -> None:
