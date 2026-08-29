@@ -1,1 +1,0 @@
-static-polaron-v0.1
