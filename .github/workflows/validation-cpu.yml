@@ -1,8 +1,6 @@
 name: validation-cpu
 
 on:
-  push:
-    branches: [cpu-optimization-v0.2]
   workflow_dispatch:
 
 jobs:
