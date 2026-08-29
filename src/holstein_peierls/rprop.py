@@ -1,4 +1,4 @@
-"""Resilient backpropagation minimizer with an explicit legacy-compatibility mode."""
+"""Resilient backpropagation minimizer with explicit compatibility controls."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 
 from .electronic import GroundState, SolverName
 from .energy import EnergyBreakdown, total_energy
-from .gradients import LatticeGradient, energy_gradient
+from .gradients import GradientMode, LatticeGradient, energy_gradient
 from .lattice import LatticeState
 from .parameters import StaticPolaronParameters
 
@@ -95,6 +95,7 @@ def minimize_legacy_rprop(
     parameters: StaticPolaronParameters,
     *,
     solver: SolverName = "dense_lowest",
+    gradient_mode: GradientMode = "optimized",
     stop_when_all_coordinates_converge: bool = False,
     progress: ProgressCallback | None = None,
 ) -> RPropOutput:
@@ -104,6 +105,10 @@ def minimize_legacy_rprop(
     for the gradient at the beginning of the next iteration. This removes one
     redundant diagonalization per iteration without changing the mathematical
     state at which the gradient is evaluated.
+
+    ``gradient_mode="reference"`` retains the archived density-matrix arithmetic
+    for strict historical regression. The default ``"optimized"`` path uses
+    only O(N) nearest-neighbour wavefunction products.
     """
     state = initial_state.copy()
     state.validate()
@@ -126,6 +131,7 @@ def minimize_legacy_rprop(
             parameters,
             solver=solver,
             ground_state=cached_ground_state,
+            mode=gradient_mode,
         )
         current = {
             "u": np.array(gradient.u, copy=True),
