@@ -7,7 +7,7 @@ crossings in the adiabatic energy landscape.
 
 For finite-cell binding decisions, the primary reference is the relaxed
 ``separated`` branch obtained with the *same two-particle solver*, lattice size,
-and numerical tolerances.  ``2 * E_polaron`` is retained only as a secondary
+and numerical tolerances. ``2 * E_polaron`` is retained only as a secondary
 cross-check because meV-scale finite-size/self-consistency differences can be
 comparable to weak pair binding energies.
 """
@@ -83,6 +83,9 @@ def main() -> None:
         type=float,
         default=[0.45, 0.50, 0.525, 0.55, 0.60, 0.70, 0.80, 0.90, 1.00, 1.20, 1.50],
     )
+    parser.add_argument("--max-iterations", type=int, default=1200)
+    parser.add_argument("--displacement-tolerance", type=float, default=1.0e-7)
+    parser.add_argument("--gradient-tolerance", type=float, default=1.0e-6)
     parser.add_argument("--output", type=Path, default=Path("bipolaron-branches"))
     args = parser.parse_args()
 
@@ -96,8 +99,9 @@ def main() -> None:
     base = replace(
         base,
         pair_position=center_position(args.size),
-        max_iterations=900,
-        convergence_criterion=1.0e-7,
+        max_iterations=args.max_iterations,
+        convergence_criterion=args.displacement_tolerance,
+        gradient_convergence_criterion=args.gradient_tolerance,
         eigensolver_tolerance=2.0e-10,
     )
 
@@ -147,12 +151,17 @@ def main() -> None:
                     "one_body_ipr": obs.one_body_ipr,
                     "iterations": result.diagnostics.iterations,
                     "converged": result.diagnostics.converged,
+                    "final_max_update_A": result.diagnostics.final_max_update,
+                    "final_max_gradient_eV_per_A": result.diagnostics.final_max_gradient,
                 }
             )
 
         best, obs = candidates[best_seed]
         binding_vs_2e1 = 2.0 * e1 - best.energy.total
         binding_vs_separated = separated_energy - best.energy.total
+        max_gradient = max(
+            result.diagnostics.final_max_gradient for result, _ in candidates.values()
+        )
         summary.append(
             {
                 "size": args.size,
@@ -171,19 +180,22 @@ def main() -> None:
                 "mean_dx": obs.mean_dx,
                 "mean_dy": obs.mean_dy,
                 "one_body_ipr": obs.one_body_ipr,
+                "best_final_max_gradient_eV_per_A": best.diagnostics.final_max_gradient,
+                "max_branch_gradient_eV_per_A": max_gradient,
                 "all_branches_converged": all(
                     result.diagnostics.converged for result, _ in candidates.values()
                 ),
             }
         )
         print(
-            f"U={hubbard_u:5.3f} best={best_seed:11s} "
+            f"U={hubbard_u:6.4f} best={best_seed:11s} "
             f"Ebind_sep={binding_vs_separated:+.8f} eV "
-            f"Ebind_2E1={binding_vs_2e1:+.8f} eV "
             f"P0={obs.onsite_probability:.4f} "
             f"PNNx={obs.nearest_neighbour_x_probability:.4f} "
             f"PNNy={obs.nearest_neighbour_y_probability:.4f} "
-            f"<r>={obs.mean_separation:.3f}"
+            f"<r>={obs.mean_separation:.3f} "
+            f"gmax={best.diagnostics.final_max_gradient:.3e} eV/A "
+            f"all_conv={summary[-1]['all_branches_converged']}"
         )
 
     args.output.mkdir(parents=True, exist_ok=True)

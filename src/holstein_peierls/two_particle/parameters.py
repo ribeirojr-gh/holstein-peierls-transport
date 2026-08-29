@@ -13,11 +13,12 @@ class BipolaronParameters:
     """Adiabatic Holstein-Hubbard parameters for two equal charge carriers.
 
     This first two-particle implementation intentionally excludes Peierls
-    coupling.  It is a validation stage designed to recover known limiting
+    coupling. It is a validation stage designed to recover known limiting
     behaviour before the intermolecular lattice coordinates are activated.
 
     Energies are in eV and displacements in angstrom, matching the validated
-    single-polaron implementation.
+    single-polaron implementation. ``gradient_convergence_criterion`` is in
+    eV/angstrom.
     """
 
     nx: int = 20
@@ -35,6 +36,7 @@ class BipolaronParameters:
     acceleration_factor: float = 1.2
     deceleration_factor: float = 0.5
     convergence_criterion: float = 1.0e-8
+    gradient_convergence_criterion: float = 1.0e-6
     eigensolver_tolerance: float = 1.0e-11
     eigensolver_max_iterations: int = 20_000
 

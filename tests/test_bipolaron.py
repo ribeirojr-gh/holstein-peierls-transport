@@ -6,6 +6,7 @@ from holstein_peierls.two_particle.bipolaron import (
     atomic_limit_binding_energy,
     energy_gradient_u,
     expectation_energy,
+    relax_static_bipolaron,
     solve_bipolaron_ground_state,
     total_energy,
 )
@@ -121,3 +122,27 @@ def test_atomic_limit_critical_u_matches_current_parameter_scale() -> None:
     p = BipolaronParameters()
     assert np.isclose(p.atomic_holstein_pairing_scale, 9.0 / 16.51, atol=1e-15)
     assert 0.545 < p.atomic_holstein_pairing_scale < 0.546
+
+
+def test_relaxation_reports_stationary_residual_gradient() -> None:
+    p = BipolaronParameters(
+        nx=3,
+        ny=3,
+        pair_position=5,
+        hubbard_u=0.30,
+        max_iterations=800,
+        convergence_criterion=1.0e-6,
+        gradient_convergence_criterion=2.0e-5,
+        eigensolver_tolerance=1.0e-12,
+    )
+    result = relax_static_bipolaron(p, initialization="onsite")
+    gradient, _ = energy_gradient_u(
+        result.u,
+        p,
+        ground_state=result.ground_state,
+    )
+    measured = float(np.max(np.abs(gradient)))
+    assert result.diagnostics.converged
+    assert np.isclose(result.diagnostics.final_max_gradient, measured, atol=1e-12)
+    assert measured < p.gradient_convergence_criterion
+    assert result.diagnostics.final_max_update < p.convergence_criterion

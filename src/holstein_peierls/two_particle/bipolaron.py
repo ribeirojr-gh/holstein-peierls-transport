@@ -1,13 +1,13 @@
 """Matrix-free adiabatic Holstein-Hubbard singlet bipolaron solver.
 
 The two-particle wavefunction is represented as ``psi[i, j]`` on the ordered
-site-product basis.  We remain in the spin-singlet sector by starting the
+site-product basis. We remain in the spin-singlet sector by starting the
 Krylov iteration with a symmetric vector; the Hamiltonian preserves particle
-exchange symmetry.  The returned state is explicitly symmetrized to remove
+exchange symmetry. The returned state is explicitly symmetrized to remove
 round-off-level antisymmetric contamination.
 
 This module deliberately contains *only* the intramolecular Holstein coordinate
-``u`` and an on-site Hubbard repulsion ``U``.  Peierls coupling is added only
+``u`` and an on-site Hubbard repulsion ``U``. Peierls coupling is added only
 after this reference problem passes its analytic and numerical regressions.
 """
 
@@ -69,6 +69,7 @@ class BipolaronRelaxationDiagnostics:
     iterations: int
     converged: bool
     final_max_update: float
+    final_max_gradient: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,7 +88,11 @@ def _site_neighbours(parameters: BipolaronParameters) -> tuple[FloatArray, Float
     sites = np.arange(parameters.n_sites, dtype=np.int64).reshape(
         parameters.ny, parameters.nx
     )
-    return sites.ravel(), np.roll(sites, -1, axis=1).ravel(), np.roll(sites, -1, axis=0).ravel()
+    return (
+        sites.ravel(),
+        np.roll(sites, -1, axis=1).ravel(),
+        np.roll(sites, -1, axis=0).ravel(),
+    )
 
 
 def build_one_particle_hamiltonian(
@@ -199,7 +204,7 @@ def solve_bipolaron_ground_state(
         psi0 = np.asarray(initial_wavefunction, dtype=np.float64).reshape((n, n))
         v0 = _normalize_symmetric_wavefunction(psi0).ravel(order="C")
 
-    eigenvalues, eigenvectors = eigsh(
+    _, eigenvectors = eigsh(
         operator,
         k=1,
         which="SA",
@@ -300,7 +305,7 @@ def relax_static_bipolaron(
     initialization: InitializationMode = "onsite",
     initial_u: FloatArray | None = None,
 ) -> BipolaronResult:
-    """Relax the Holstein coordinate using a standard sign-based RPROP update."""
+    """Relax ``u`` with RPROP and require displacement and force convergence."""
     if initial_u is None:
         u = initial_distortion(parameters, initialization)
     else:
@@ -313,6 +318,7 @@ def relax_static_bipolaron(
     cached_state: BipolaronGroundState | None = None
     converged = False
     final_max_update = np.inf
+    final_max_gradient = np.inf
     final_energy: BipolaronEnergy | None = None
     final_state: BipolaronGroundState | None = None
 
@@ -344,11 +350,20 @@ def relax_static_bipolaron(
             initial_wavefunction=current_state.wavefunction,
         )
         final_energy, _ = total_energy(u, parameters, ground_state=final_state)
+        final_gradient, _ = energy_gradient_u(
+            u,
+            parameters,
+            ground_state=final_state,
+        )
         cached_state = final_state
         previous_gradient = effective_gradient
 
         final_max_update = float(np.max(np.abs(delta)))
-        converged = final_max_update < parameters.convergence_criterion
+        final_max_gradient = float(np.max(np.abs(final_gradient)))
+        converged = (
+            final_max_update < parameters.convergence_criterion
+            and final_max_gradient < parameters.gradient_convergence_criterion
+        )
         if converged:
             break
 
@@ -361,5 +376,6 @@ def relax_static_bipolaron(
             iterations=iteration,
             converged=converged,
             final_max_update=final_max_update,
+            final_max_gradient=final_max_gradient,
         ),
     )
