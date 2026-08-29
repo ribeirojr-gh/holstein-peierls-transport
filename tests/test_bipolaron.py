@@ -28,6 +28,15 @@ def test_rigid_noninteracting_limit_is_two_single_particle_ground_energies() -> 
     expected_one_particle = -2.0 * p.j0x - 2.0 * p.j0y
     assert np.isclose(ground.energy, 2.0 * expected_one_particle, atol=2e-11)
 
+    # The noninteracting periodic ground state is the product of two uniform
+    # one-particle Bloch states. Its ordered-pair probability therefore
+    # factorizes exactly into 1/N^2 on every (i, j) configuration.
+    expected_probability = np.full(
+        (p.n_sites, p.n_sites),
+        1.0 / float(p.n_sites**2),
+    )
+    assert np.allclose(ground.probability, expected_probability, atol=2e-12)
+
 
 def test_ground_state_remains_in_singlet_spatial_sector() -> None:
     p = BipolaronParameters(nx=3, ny=3, pair_position=5, hubbard_u=0.25)
@@ -37,7 +46,7 @@ def test_ground_state_remains_in_singlet_spatial_sector() -> None:
     assert ground.exchange_symmetry_error < 2e-14
 
 
-def test_one_body_density_matrix_has_two_particles() -> None:
+def test_one_body_density_matrix_has_two_particles_and_is_hermitian() -> None:
     p = BipolaronParameters(nx=3, ny=3, pair_position=5, hubbard_u=0.2)
     u = np.zeros((3, 3))
     u[1, 1] = -0.12
@@ -45,6 +54,7 @@ def test_one_body_density_matrix_has_two_particles() -> None:
     gamma = ground.one_body_density_matrix
     assert np.isclose(np.trace(gamma), 2.0, atol=2e-12)
     assert np.isclose(np.sum(ground.site_density), 2.0, atol=2e-12)
+    assert np.allclose(gamma, gamma.T.conj(), atol=2e-14)
 
 
 def test_holstein_gradient_matches_finite_difference() -> None:
