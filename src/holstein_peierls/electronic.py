@@ -21,6 +21,7 @@ SolverName = Literal["dense_full", "dense_lowest", "sparse"]
 @dataclass(frozen=True, slots=True)
 class GroundState:
     """Lowest electronic eigenstate for a fixed lattice configuration."""
+
     energy: float
     wavefunction: FloatArray
 
@@ -29,13 +30,38 @@ class GroundState:
         return np.square(self.wavefunction)
 
 
+def _normalized_initial_vector(
+    initial_wavefunction: FloatArray | None,
+    n_sites: int,
+) -> FloatArray:
+    """Return a deterministic normalized starting vector for iterative solvers."""
+    if initial_wavefunction is None:
+        return np.full(n_sites, 1.0 / np.sqrt(n_sites), dtype=np.float64)
+
+    vector = np.asarray(initial_wavefunction, dtype=np.float64).reshape(-1)
+    if vector.size != n_sites:
+        raise ValueError("initial wavefunction size does not match lattice")
+    norm = float(np.linalg.norm(vector))
+    if not np.isfinite(norm) or norm == 0.0:
+        raise ValueError("initial wavefunction must have a finite non-zero norm")
+    return vector / norm
+
+
 def solve_ground_state(
     state: LatticeState,
     parameters: StaticPolaronParameters,
     *,
     solver: SolverName = "dense_lowest",
+    initial_wavefunction: FloatArray | None = None,
 ) -> GroundState:
-    """Solve the electronic ground state using a selected CPU eigensolver."""
+    """Solve the electronic ground state using a selected CPU eigensolver.
+
+    ``initial_wavefunction`` is used only by the iterative sparse solver. During
+    RPROP relaxation, passing the previous electronic ground state provides an
+    adiabatic warm start. This both reduces eigensolver work and prevents an
+    arbitrary switch between translationally equivalent localized solutions on
+    a periodic lattice.
+    """
     if solver == "dense_full":
         hamiltonian = build_dense_hamiltonian(state, parameters)
         eigenvalues, eigenvectors = eigh(
@@ -56,7 +82,9 @@ def solve_ground_state(
         wavefunction = np.asarray(eigenvectors[:, 0], dtype=np.float64)
     elif solver == "sparse":
         hamiltonian = build_sparse_hamiltonian(state, parameters)
-        initial_vector = np.full(parameters.n_sites, 1.0 / np.sqrt(parameters.n_sites))
+        initial_vector = _normalized_initial_vector(
+            initial_wavefunction, parameters.n_sites
+        )
         eigenvalues, eigenvectors = eigsh(
             hamiltonian,
             k=1,
