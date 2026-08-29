@@ -1,0 +1,33 @@
+name: validation-cpu
+
+on:
+  push:
+    branches: [cpu-optimization-v0.2]
+  workflow_dispatch:
+
+jobs:
+  validate-20x20:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install package
+        run: python -m pip install -e .
+      - name: Run full 20x20 validation
+        env:
+          OMP_NUM_THREADS: '1'
+          OPENBLAS_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+        run: >-
+          python benchmarks/validate_static_20x20.py
+          --parameters examples/static_polaron/parameters1.inc
+          --output validation-results
+      - name: Upload validation results
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-20x20-validation
+          path: validation-results/
+          retention-days: 90
