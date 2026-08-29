@@ -8,7 +8,7 @@ from typing import Callable
 import numpy as np
 from numpy.typing import NDArray
 
-from .electronic import GroundState, SolverName
+from .electronic import GroundState, SolverName, solve_ground_state
 from .energy import EnergyBreakdown, total_energy
 from .gradients import GradientMode, LatticeGradient, energy_gradient
 from .lattice import LatticeState
@@ -106,6 +106,11 @@ def minimize_legacy_rprop(
     redundant diagonalization per iteration without changing the mathematical
     state at which the gradient is evaluated.
 
+    For the sparse eigensolver, the pre-update electronic state is also passed
+    as the iterative starting vector after the lattice step. This provides
+    adiabatic continuity between RPROP iterations and avoids arbitrary switches
+    among translationally equivalent localized states in a periodic lattice.
+
     ``gradient_mode="reference"`` retains the archived density-matrix arithmetic
     for strict historical regression. The default ``"optimized"`` path uses
     only O(N) nearest-neighbour wavefunction products.
@@ -126,7 +131,7 @@ def minimize_legacy_rprop(
     iterations_done = 0
 
     for iteration in range(1, parameters.max_iterations + 1):
-        gradient, _ = energy_gradient(
+        gradient, gradient_ground_state = energy_gradient(
             state,
             parameters,
             solver=solver,
@@ -143,7 +148,18 @@ def minimize_legacy_rprop(
         for name in ("u", "vx", "vy"):
             _legacy_axis_step(values[name], current[name], memories[name], parameters)
 
-        final_energy, final_ground_state = total_energy(state, parameters, solver=solver)
+        final_ground_state = solve_ground_state(
+            state,
+            parameters,
+            solver=solver,
+            initial_wavefunction=gradient_ground_state.wavefunction,
+        )
+        final_energy, _ = total_energy(
+            state,
+            parameters,
+            solver=solver,
+            ground_state=final_ground_state,
+        )
         cached_ground_state = final_ground_state
         iterations_done = iteration
 
