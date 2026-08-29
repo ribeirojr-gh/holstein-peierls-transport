@@ -1,0 +1,45 @@
+name: bipolaron-peierls-12x12-selected
+
+on:
+  push:
+    branches: [two-particle-static-theory]
+    paths:
+      - '.github/workflows/bipolaron-peierls-12x12-selected.yml'
+  workflow_dispatch:
+
+jobs:
+  selected-12x12:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        alpha_y: ['0.000', '0.120']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install package
+        run: python -m pip install -e .
+      - name: Validate selected bound and weak-pair regimes
+        env:
+          OMP_NUM_THREADS: '1'
+          OPENBLAS_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+        run: >-
+          python experiments/bipolaron_peierls_scan.py
+          --size 12
+          --alpha-x-values 0.000 0.100
+          --alpha-y ${{ matrix.alpha_y }}
+          --u-values 0.525 0.700 1.000 1.100 1.200
+          --max-iterations 1500
+          --displacement-tolerance 1e-6
+          --gradient-tolerance 2e-5
+          --output selected-12x12-ay-${{ matrix.alpha_y }}
+      - name: Upload selected results
+        uses: actions/upload-artifact@v4
+        with:
+          name: selected-12x12-ay-${{ matrix.alpha_y }}
+          path: selected-12x12-ay-${{ matrix.alpha_y }}/
+          retention-days: 90
