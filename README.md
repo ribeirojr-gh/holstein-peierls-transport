@@ -6,11 +6,15 @@ molecular organic semiconductors.
 
 ## Status
 
-The current stable release is `0.1.0a1` and covers **static polaron formation
-only**. Development toward the optimized CPU solver is performed separately
-before changes are consolidated into the next version. The dynamical `hp2D.f90`
-workflow will be migrated only after the static solver remains numerically
-consistent with the validated reference implementation.
+Version `0.2.0a1` covers **static polaron formation** and introduces an optimized
+CPU path while preserving the validated `0.1.0a1` reference behavior. The
+dynamical `hp2D.f90` workflow remains intentionally deferred until the static
+solver and its performance-oriented reformulations are fully consolidated.
+
+The optimized implementation now provides a direct sparse Hamiltonian, an O(N)
+analytical gradient, iterative ground-state solution, and reuse of electronic
+states between RPROP iterations. A strict reference path remains available for
+regression against the archived Fortran implementation.
 
 ## Scientific model
 
@@ -86,21 +90,49 @@ python -m pip install -e ".[dev]"
 pytest
 ```
 
-## First static-polaron run
+## Recommended static-polaron run
 
-A legacy-format example input is included in the repository:
+The optimized sparse CPU path is requested explicitly:
 
 ```bash
 hp-polaron \
   --parameters examples/static_polaron/parameters1.inc \
-  --solver dense_lowest \
+  --solver sparse \
+  --gradient optimized \
   --output run-static
 ```
 
-Use `--solver dense_full` for the closest numerical analogue of the full LAPACK
-diagonalization used by `rprop.f90`. The modern default requires `u`, `vx`, and
-`vy` to converge. Use `--legacy-convergence` only for regression against the
-historical `u`-only stopping rule.
+For the closest numerical analogue of the archived static Fortran program, use:
+
+```bash
+hp-polaron \
+  --parameters examples/static_polaron/parameters1.inc \
+  --solver dense_full \
+  --gradient reference \
+  --legacy-convergence \
+  --output run-reference
+```
+
+The CLI keeps `dense_lowest` as its default eigensolver in `0.2.0a1`; therefore,
+choosing the sparse iterative solver is explicit. The modern default stopping
+criterion requires `u`, `vx`, and `vy` to converge. Use
+`--legacy-convergence` only when reproducing the historical u-only stopping
+rule.
+
+## Validation and benchmarks
+
+The optimized gradient is algebraically equivalent to the reference expression
+but avoids the complete N x N density matrix. Validation accounts explicitly
+for periodic translations of a localized polaron and constant zero modes of the
+Peierls coordinates. See `docs/cpu-optimization-v0.2.md` for the numerical
+comparison and reproducible benchmark commands.
+
+On the current GitHub CPU benchmark, the optimized gradient is approximately
+13x, 60x, and 301x faster than the reference gradient for 20x20, 40x40, and
+80x80 lattices, respectively. The sparse ground-state solve is approximately
+61x faster than `dense_lowest` for the tested 40x40 case. These values are
+hardware- and library-dependent and are reported as implementation benchmarks,
+not universal performance claims.
 
 ## Development stages
 
