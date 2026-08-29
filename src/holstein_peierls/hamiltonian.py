@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.sparse import csr_matrix
+from scipy.sparse import coo_matrix, csr_matrix
 
 from .lattice import LatticeState
 from .parameters import StaticPolaronParameters
@@ -24,10 +24,24 @@ def bond_transfer_integrals(
     return tx, ty
 
 
+def _site_neighbours(parameters: StaticPolaronParameters) -> tuple[NDArray[np.int64], NDArray[np.int64], NDArray[np.int64]]:
+    """Return flattened site, +x-neighbour, and +y-neighbour index arrays."""
+    sites = np.arange(parameters.n_sites, dtype=np.int64).reshape(
+        parameters.ny, parameters.nx
+    )
+    right = np.roll(sites, shift=-1, axis=1)
+    down = np.roll(sites, shift=-1, axis=0)
+    return sites.ravel(), right.ravel(), down.ravel()
+
+
 def build_dense_hamiltonian(
     state: LatticeState, parameters: StaticPolaronParameters
 ) -> FloatArray:
-    """Construct the real symmetric Hamiltonian used by ``rprop.f90``."""
+    """Construct the real symmetric Hamiltonian used by ``rprop.f90``.
+
+    The implementation is vectorized but preserves the same matrix elements and
+    C-order site mapping as the archived Fortran program.
+    """
     ny, nx = state.shape
     if (ny, nx) != (parameters.ny, parameters.nx):
         raise ValueError("lattice shape does not match parameters")
@@ -38,21 +52,44 @@ def build_dense_hamiltonian(
     np.fill_diagonal(hamiltonian, diagonal)
 
     tx, ty = bond_transfer_integrals(state, parameters)
-    for y in range(ny):
-        for x in range(nx):
-            i = x + nx * y
-            right = ((x + 1) % nx) + nx * y
-            down = x + nx * ((y + 1) % ny)
-            hamiltonian[i, right] = tx[y, x]
-            hamiltonian[right, i] = tx[y, x]
-            hamiltonian[i, down] = ty[y, x]
-            hamiltonian[down, i] = ty[y, x]
+    sites, right, down = _site_neighbours(parameters)
+    tx_flat = tx.ravel(order="C")
+    ty_flat = ty.ravel(order="C")
 
+    hamiltonian[sites, right] = tx_flat
+    hamiltonian[right, sites] = tx_flat
+    hamiltonian[sites, down] = ty_flat
+    hamiltonian[down, sites] = ty_flat
     return hamiltonian
 
 
 def build_sparse_hamiltonian(
     state: LatticeState, parameters: StaticPolaronParameters
 ) -> csr_matrix:
-    """Construct a CSR Hamiltonian with the same matrix elements as the legacy code."""
-    return csr_matrix(build_dense_hamiltonian(state, parameters))
+    """Construct the Hamiltonian directly in sparse CSR form.
+
+    For production lattice sizes this avoids the previous dense ``N x N``
+    allocation followed by dense-to-CSR conversion. Very small two-site
+    periodic dimensions fall back to the dense reference path because the
+    archived assignment semantics overwrite duplicate periodic bonds rather
+    than summing them.
+    """
+    ny, nx = state.shape
+    if (ny, nx) != (parameters.ny, parameters.nx):
+        raise ValueError("lattice shape does not match parameters")
+    if nx < 3 or ny < 3:
+        return csr_matrix(build_dense_hamiltonian(state, parameters))
+
+    sites, right, down = _site_neighbours(parameters)
+    tx, ty = bond_transfer_integrals(state, parameters)
+    diagonal = parameters.alpha_intra * state.u.ravel(order="C")
+    tx_flat = tx.ravel(order="C")
+    ty_flat = ty.ravel(order="C")
+
+    rows = np.concatenate((sites, sites, right, sites, down))
+    cols = np.concatenate((sites, right, sites, down, sites))
+    data = np.concatenate((diagonal, tx_flat, tx_flat, ty_flat, ty_flat))
+
+    return coo_matrix(
+        (data, (rows, cols)), shape=(parameters.n_sites, parameters.n_sites)
+    ).tocsr()
