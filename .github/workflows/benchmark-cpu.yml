@@ -25,7 +25,7 @@ jobs:
           python benchmarks/static_cpu.py
           --sizes 20 40 80
           --solvers dense_lowest sparse
-          --repeats 1
+          --repeats 3
           --dense-max-sites 1600
           --output benchmark-results
       - name: Upload benchmark results
