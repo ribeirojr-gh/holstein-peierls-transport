@@ -1,0 +1,36 @@
+name: source-snapshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - VERSION
+  workflow_dispatch:
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read version
+        id: version
+        shell: bash
+        run: echo "version=$(tr -d '\n\r ' < VERSION)" >> "$GITHUB_OUTPUT"
+      - name: Create provenance manifest
+        shell: bash
+        run: |
+          mkdir -p snapshot
+          printf 'version=%s\ncommit=%s\ncreated_utc=%s\n' \
+            "${{ steps.version.outputs.version }}" \
+            "${GITHUB_SHA}" \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > snapshot/PROVENANCE.txt
+          cp README.md pyproject.toml VERSION snapshot/
+          cp -a src tests examples docs .github snapshot/
+      - name: Upload source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: holstein-peierls-transport-v${{ steps.version.outputs.version }}-${{ github.sha }}
+          path: snapshot
+          if-no-files-found: error
+          retention-days: 90
