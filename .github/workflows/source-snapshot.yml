@@ -26,7 +26,7 @@ jobs:
             "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             > snapshot/PROVENANCE.txt
           cp README.md pyproject.toml VERSION snapshot/
-          cp -a src tests examples docs .github snapshot/
+          cp -a src tests examples docs benchmarks .github snapshot/
       - name: Upload source snapshot
         uses: actions/upload-artifact@v4
         with:
