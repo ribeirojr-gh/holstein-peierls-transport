@@ -1,4 +1,4 @@
-"""Parameters for the experimental static singlet bipolaron solver."""
+"""Parameters for the experimental static singlet bipolaron solvers."""
 
 from __future__ import annotations
 
@@ -10,23 +10,23 @@ from ..parameters import StaticPolaronParameters
 
 @dataclass(frozen=True, slots=True)
 class BipolaronParameters:
-    """Adiabatic Holstein-Hubbard parameters for two equal charge carriers.
-
-    This first two-particle implementation intentionally excludes Peierls
-    coupling. It is a validation stage designed to recover known limiting
-    behaviour before the intermolecular lattice coordinates are activated.
+    """Adiabatic Holstein-Peierls-Hubbard parameters for two equal carriers.
 
     Energies are in eV and displacements in angstrom, matching the validated
     single-polaron implementation. ``gradient_convergence_criterion`` is in
-    eV/angstrom.
+    eV/angstrom. The Holstein-only reference solver ignores ``k2`` and the
+    intermolecular coupling constants; the Peierls extension activates them.
     """
 
     nx: int = 20
     ny: int = 20
     k1: float = 16.51
+    k2: float = 0.51
     j0x: float = 0.100
     j0y: float = 0.015
     alpha_intra: float = 3.0
+    alpha_interx: float = 0.4
+    alpha_intery: float = 0.4
     hubbard_u: float = 0.0
     pair_position: int = 205
     max_iterations: int = 2000
@@ -74,9 +74,12 @@ class BipolaronParameters:
             nx=parameters.nx,
             ny=parameters.ny,
             k1=parameters.k1,
+            k2=parameters.k2,
             j0x=parameters.j0x,
             j0y=parameters.j0y,
             alpha_intra=parameters.alpha_intra,
+            alpha_interx=parameters.alpha_interx,
+            alpha_intery=parameters.alpha_intery,
             hubbard_u=hubbard_u,
             pair_position=parameters.polaron_position,
             max_iterations=parameters.max_iterations,
