@@ -18,15 +18,19 @@ class PairObservables:
     """Geometry-sensitive diagnostics of a normalized two-particle state.
 
     Distances are measured in lattice-site units using the minimum-image
-    convention on the periodic rectangular lattice.  The radial distribution is
-    represented by squared lattice distance, ``dx**2 + dy**2``, so no arbitrary
-    floating-point binning is required.
+    convention on the periodic rectangular lattice. The nearest-neighbour
+    probability is additionally resolved into x and y contributions so that
+    anisotropic molecular-crystal pair states can be identified.
     """
 
     onsite_probability: float
     nearest_neighbour_probability: float
+    nearest_neighbour_x_probability: float
+    nearest_neighbour_y_probability: float
     mean_separation: float
     rms_separation: float
+    mean_dx: float
+    mean_dy: float
     one_body_ipr: float
     radial_probability_by_r2: dict[int, float]
 
@@ -66,9 +70,15 @@ def pair_observables(
     distance = np.sqrt(dx * dx + dy * dy)
 
     onsite_mask = r2 == 0
-    nearest_mask = r2 == 1
+    nearest_x_mask = (dx == 1.0) & (dy == 0.0)
+    nearest_y_mask = (dx == 0.0) & (dy == 1.0)
+
     onsite = float(np.sum(probability[onsite_mask]))
-    nearest = float(np.sum(probability[nearest_mask]))
+    nearest_x = float(np.sum(probability[nearest_x_mask]))
+    nearest_y = float(np.sum(probability[nearest_y_mask]))
+    nearest = nearest_x + nearest_y
+    mean_dx = float(np.sum(probability * dx))
+    mean_dy = float(np.sum(probability * dy))
     mean = float(np.sum(probability * distance))
     rms = float(np.sqrt(np.sum(probability * r2)))
 
@@ -84,8 +94,12 @@ def pair_observables(
     return PairObservables(
         onsite_probability=onsite,
         nearest_neighbour_probability=nearest,
+        nearest_neighbour_x_probability=nearest_x,
+        nearest_neighbour_y_probability=nearest_y,
         mean_separation=mean,
         rms_separation=rms,
+        mean_dx=mean_dx,
+        mean_dy=mean_dy,
         one_body_ipr=one_body_ipr,
         radial_probability_by_r2=radial,
     )
