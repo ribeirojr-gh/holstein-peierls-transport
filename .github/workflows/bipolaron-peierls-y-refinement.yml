@@ -1,0 +1,45 @@
+name: bipolaron-peierls-y-refinement
+
+on:
+  push:
+    branches: [two-particle-static-theory]
+    paths:
+      - '.github/workflows/bipolaron-peierls-y-refinement.yml'
+  workflow_dispatch:
+
+jobs:
+  peierls-y-refinement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install package
+        run: python -m pip install -e .
+      - name: Refine alpha-y with alpha-x disabled
+        env:
+          OMP_NUM_THREADS: '1'
+          OPENBLAS_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+        run: |
+          set -euo pipefail
+          for ay in 0.080 0.100 0.120 0.140 0.160; do
+            echo "=== alpha_y=${ay} eV/A ==="
+            python experiments/bipolaron_peierls_scan.py \
+              --size 10 \
+              --alpha-x-values 0.000 \
+              --alpha-y "${ay}" \
+              --u-values 0.450 0.475 0.500 0.5125 0.525 0.550 0.700 1.000 1.100 \
+              --max-iterations 1200 \
+              --displacement-tolerance 1e-6 \
+              --gradient-tolerance 2e-5 \
+              --output "bipolaron-peierls-y-refinement-${ay}"
+          done
+      - name: Upload y-refinement results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bipolaron-peierls-y-refinement-10x10
+          path: 'bipolaron-peierls-y-refinement-*/'
+          retention-days: 90
