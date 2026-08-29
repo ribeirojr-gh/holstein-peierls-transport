@@ -98,7 +98,13 @@ def minimize_legacy_rprop(
     stop_when_all_coordinates_converge: bool = False,
     progress: ProgressCallback | None = None,
 ) -> RPropOutput:
-    """Relax a polaron with the historical RPROP update equations."""
+    """Relax a polaron with the historical RPROP update equations.
+
+    The electronic state evaluated after an RPROP update is cached and reused
+    for the gradient at the beginning of the next iteration. This removes one
+    redundant diagonalization per iteration without changing the mathematical
+    state at which the gradient is evaluated.
+    """
     state = initial_state.copy()
     state.validate()
     shape = state.shape
@@ -108,14 +114,19 @@ def minimize_legacy_rprop(
         "vy": _AxisMemory.create(shape, parameters.update_start),
     }
 
-    total_energy(state, parameters, solver=solver)
     converged_u = converged_vx = converged_vy = False
     final_energy: EnergyBreakdown | None = None
     final_ground_state: GroundState | None = None
+    cached_ground_state: GroundState | None = None
     iterations_done = 0
 
     for iteration in range(1, parameters.max_iterations + 1):
-        gradient, _ = energy_gradient(state, parameters, solver=solver)
+        gradient, _ = energy_gradient(
+            state,
+            parameters,
+            solver=solver,
+            ground_state=cached_ground_state,
+        )
         current = {
             "u": np.array(gradient.u, copy=True),
             "vx": np.array(gradient.vx, copy=True),
@@ -127,6 +138,7 @@ def minimize_legacy_rprop(
             _legacy_axis_step(values[name], current[name], memories[name], parameters)
 
         final_energy, final_ground_state = total_energy(state, parameters, solver=solver)
+        cached_ground_state = final_ground_state
         iterations_done = iteration
 
         du = memories["u"].delta
@@ -143,7 +155,12 @@ def minimize_legacy_rprop(
             memory.previous_gradient[...] = current[name]
 
         if progress is not None:
-            progress(iteration, final_energy, state, LatticeGradient(current["u"], current["vx"], current["vy"]))
+            progress(
+                iteration,
+                final_energy,
+                state,
+                LatticeGradient(current["u"], current["vx"], current["vy"]),
+            )
 
         done = (
             converged_u and converged_vx and converged_vy
