@@ -1,9 +1,15 @@
 """Resolve competing Holstein-Hubbard bipolaron branches on an anisotropic lattice.
 
 Four lattice seeds are relaxed independently: onsite, intersite-x, intersite-y,
-and maximally separated.  Recording every converged branch, rather than only the
+and maximally separated. Recording every converged branch, rather than only the
 lowest energy, is essential for detecting metastability and first-order branch
 crossings in the adiabatic energy landscape.
+
+For finite-cell binding decisions, the primary reference is the relaxed
+``separated`` branch obtained with the *same two-particle solver*, lattice size,
+and numerical tolerances.  ``2 * E_polaron`` is retained only as a secondary
+cross-check because meV-scale finite-size/self-consistency differences can be
+comparable to weak pair binding energies.
 """
 
 from __future__ import annotations
@@ -106,19 +112,30 @@ def main() -> None:
             "intersite_y": intersite_distortion(p, "y"),
             "separated": initial_distortion(p, "separated"),
         }
-        candidates = {}
+
+        candidates: dict[str, tuple[object, object]] = {}
         for seed_name, seed_u in seeds.items():
             result = relax_static_bipolaron(p, initial_u=seed_u)
             obs = pair_observables(result.ground_state, p)
-            binding = 2.0 * e1 - result.energy.total
-            candidates[seed_name] = (result, obs, binding)
+            candidates[seed_name] = (result, obs)
+
+        separated_energy = candidates["separated"][0].energy.total
+        best_seed = min(candidates, key=lambda key: candidates[key][0].energy.total)
+        best_energy = candidates[best_seed][0].energy.total
+
+        for seed_name, (result, obs) in candidates.items():
+            binding_vs_2e1 = 2.0 * e1 - result.energy.total
+            binding_vs_separated = separated_energy - result.energy.total
             rows.append(
                 {
                     "size": args.size,
                     "U_eV": float(hubbard_u),
                     "seed": seed_name,
                     "total_energy_eV": result.energy.total,
-                    "binding_vs_2polarons_eV": binding,
+                    "separated_branch_energy_eV": separated_energy,
+                    "binding_vs_separated_branch_eV": binding_vs_separated,
+                    "binding_vs_2polarons_eV": binding_vs_2e1,
+                    "energy_above_best_eV": result.energy.total - best_energy,
                     "P_onsite": obs.onsite_probability,
                     "P_nn": obs.nearest_neighbour_probability,
                     "P_nn_x": obs.nearest_neighbour_x_probability,
@@ -133,27 +150,37 @@ def main() -> None:
                 }
             )
 
-        best_seed = min(candidates, key=lambda key: candidates[key][0].energy.total)
-        best, obs, binding = candidates[best_seed]
+        best, obs = candidates[best_seed]
+        binding_vs_2e1 = 2.0 * e1 - best.energy.total
+        binding_vs_separated = separated_energy - best.energy.total
         summary.append(
             {
                 "size": args.size,
                 "U_eV": float(hubbard_u),
                 "best_seed": best_seed,
                 "best_energy_eV": best.energy.total,
-                "binding_vs_2polarons_eV": binding,
+                "separated_branch_energy_eV": separated_energy,
+                "best_binding_vs_separated_branch_eV": binding_vs_separated,
+                "binding_vs_2polarons_eV": binding_vs_2e1,
                 "P_onsite": obs.onsite_probability,
+                "P_nn": obs.nearest_neighbour_probability,
                 "P_nn_x": obs.nearest_neighbour_x_probability,
                 "P_nn_y": obs.nearest_neighbour_y_probability,
                 "mean_r": obs.mean_separation,
+                "rms_r": obs.rms_separation,
                 "mean_dx": obs.mean_dx,
                 "mean_dy": obs.mean_dy,
                 "one_body_ipr": obs.one_body_ipr,
+                "all_branches_converged": all(
+                    result.diagnostics.converged for result, _ in candidates.values()
+                ),
             }
         )
         print(
             f"U={hubbard_u:5.3f} best={best_seed:11s} "
-            f"Ebind={binding:+.8f} eV P0={obs.onsite_probability:.4f} "
+            f"Ebind_sep={binding_vs_separated:+.8f} eV "
+            f"Ebind_2E1={binding_vs_2e1:+.8f} eV "
+            f"P0={obs.onsite_probability:.4f} "
             f"PNNx={obs.nearest_neighbour_x_probability:.4f} "
             f"PNNy={obs.nearest_neighbour_y_probability:.4f} "
             f"<r>={obs.mean_separation:.3f}"
