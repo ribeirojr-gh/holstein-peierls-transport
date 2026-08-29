@@ -1,9 +1,9 @@
-"""Pilot scan of Peierls stabilization of competing singlet bipolaron branches.
+"""Scan Peierls stabilization of competing singlet bipolaron minima.
 
-The scan activates the intermolecular coupling only after the Holstein-Hubbard
-reference solver has been validated. Branches are relaxed independently from
-onsite, intersite-x, intersite-y, and separated Holstein seeds. The separated
-branch in the same periodic cell is the primary finite-size binding reference.
+Branches are relaxed independently from onsite, intersite-x, intersite-y, and
+separated Holstein seeds. The separated state in the same periodic cell is the
+primary finite-size binding reference. Seed labels are never used as physical
+state labels: each relaxed state is classified from its final pair observables.
 
 Because the transfer integral is linearized in the bond displacement, the
 output also records the largest hopping modulation relative to the bare
@@ -25,8 +25,7 @@ import numpy as np
 from holstein_peierls.lattice import LatticeState
 from holstein_peierls.parameters import StaticPolaronParameters
 from holstein_peierls.polaron import solve_static_polaron
-from holstein_peierls.two_particle.bipolaron import initial_distortion
-from holstein_peierls.two_particle.observables import pair_observables
+from holstein_peierls.two_particle.observables import PairObservables, pair_observables
 from holstein_peierls.two_particle.parameters import BipolaronParameters
 from holstein_peierls.two_particle.peierls import (
     initial_lattice_state,
@@ -71,6 +70,32 @@ def seed_state(parameters: BipolaronParameters, branch: str) -> LatticeState:
         vx=np.zeros_like(u),
         vy=np.zeros_like(u),
     )
+
+
+def classify_final_state(observables: PairObservables) -> str:
+    """Return a descriptive label based only on the final pair distribution.
+
+    This is a diagnostic classifier, not a thermodynamic phase definition.
+    A state is called separated only when less than 10% of the probability is
+    onsite/nearest-neighbour and the mean separation exceeds two lattice sites.
+    Localized states are labelled by whichever of onsite, NN-x, or NN-y carries
+    the largest probability; ambiguous residual cases are labelled ``mixed``.
+    """
+    local_probability = (
+        observables.onsite_probability + observables.nearest_neighbour_probability
+    )
+    if local_probability < 0.10 and observables.mean_separation > 2.0:
+        return "separated"
+
+    channels = {
+        "onsite": observables.onsite_probability,
+        "intersite_x": observables.nearest_neighbour_x_probability,
+        "intersite_y": observables.nearest_neighbour_y_probability,
+    }
+    label = max(channels, key=channels.get)
+    if channels[label] < 0.25:
+        return "mixed"
+    return label
 
 
 def single_polaron_energy(size: int, alpha_x: float, alpha_y: float) -> float:
@@ -146,6 +171,7 @@ def main() -> None:
     rows: list[dict[str, object]] = []
     minima: list[dict[str, object]] = []
     branches = ("onsite", "intersite_x", "intersite_y", "separated")
+    energy_equivalence_tolerance = 1.0e-8
 
     for alpha_x in args.alpha_x_values:
         one_polaron = single_polaron_energy(args.size, alpha_x, args.alpha_y)
@@ -176,16 +202,22 @@ def main() -> None:
                 )
                 obs = pair_observables(result.ground_state, p)
                 diag = distortion_diagnostics(result, p)
-                candidates[branch] = (result, obs, diag)
+                final_state = classify_final_state(obs)
+                candidates[branch] = (result, obs, diag, final_state)
 
             separated_energy = candidates["separated"][0].energy.total
-            best_branch = min(
+            best_seed = min(
                 candidates,
                 key=lambda key: candidates[key][0].energy.total,
             )
-            best_energy = candidates[best_branch][0].energy.total
+            best_energy = candidates[best_seed][0].energy.total
+            equivalent_best_seeds = [
+                seed
+                for seed, (result, _, _, _) in candidates.items()
+                if abs(result.energy.total - best_energy) <= energy_equivalence_tolerance
+            ]
 
-            for branch, (result, obs, diag) in candidates.items():
+            for branch, (result, obs, diag, final_state) in candidates.items():
                 rows.append(
                     {
                         "size": args.size,
@@ -193,6 +225,7 @@ def main() -> None:
                         "alpha_y_eV_per_A": float(args.alpha_y),
                         "U_eV": float(hubbard_u),
                         "seed": branch,
+                        "final_state": final_state,
                         "total_energy_eV": result.energy.total,
                         "separated_branch_energy_eV": separated_energy,
                         "binding_vs_separated_branch_eV": separated_energy
@@ -215,14 +248,16 @@ def main() -> None:
                     }
                 )
 
-            best, obs, diag = candidates[best_branch]
+            best, obs, diag, best_final_state = candidates[best_seed]
             minima.append(
                 {
                     "size": args.size,
                     "alpha_x_eV_per_A": float(alpha_x),
                     "alpha_y_eV_per_A": float(args.alpha_y),
                     "U_eV": float(hubbard_u),
-                    "best_seed": best_branch,
+                    "best_seed": best_seed,
+                    "best_final_state": best_final_state,
+                    "equivalent_best_seeds": ";".join(equivalent_best_seeds),
                     "best_energy_eV": best.energy.total,
                     "separated_branch_energy_eV": separated_energy,
                     "best_binding_vs_separated_branch_eV": separated_energy
@@ -240,17 +275,17 @@ def main() -> None:
                     "best_final_max_gradient_eV_per_A": best.diagnostics.final_max_gradient,
                     "max_branch_gradient_eV_per_A": max(
                         result.diagnostics.final_max_gradient
-                        for result, _, _ in candidates.values()
+                        for result, _, _, _ in candidates.values()
                     ),
                     "all_branches_converged": all(
                         result.diagnostics.converged
-                        for result, _, _ in candidates.values()
+                        for result, _, _, _ in candidates.values()
                     ),
                 }
             )
             print(
-                f"alpha_x={alpha_x:.3f} U={hubbard_u:.3f} "
-                f"best={best_branch:11s} "
+                f"alpha_x={alpha_x:.3f} U={hubbard_u:.4f} "
+                f"state={best_final_state:11s} seed={best_seed:11s} "
                 f"Ebind_sep={separated_energy - best.energy.total:+.7f} eV "
                 f"P0={obs.onsite_probability:.3f} "
                 f"PNNx={obs.nearest_neighbour_x_probability:.3f} "
