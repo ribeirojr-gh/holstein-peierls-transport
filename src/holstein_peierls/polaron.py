@@ -7,6 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .electronic import SolverName
+from .gradients import GradientMode
 from .lattice import LatticeState
 from .observables import inverse_participation_ratio, legacy_ipr, polaron_formation_energy
 from .parameters import StaticPolaronParameters
@@ -51,13 +52,16 @@ def solve_static_polaron(
     *,
     initial_state: LatticeState | None = None,
     solver: SolverName = "dense_lowest",
+    gradient_mode: GradientMode = "optimized",
     legacy_convergence: bool = False,
     apply_legacy_seed: bool = True,
 ) -> PolaronResult:
     """Relax the lattice around one excess charge.
 
-    The modern default requires all three lattice fields to converge. Set
-    ``legacy_convergence=True`` only to reproduce the historical u-only stop.
+    The modern default requires all three lattice fields to converge and uses
+    the O(N) optimized gradient. Set ``legacy_convergence=True`` and
+    ``gradient_mode="reference"`` when reproducing the historical stopping rule
+    and arithmetic path of the archived Fortran implementation.
     """
     state = prepare_initial_state(
         parameters, initial_state, apply_legacy_seed=apply_legacy_seed
@@ -66,6 +70,7 @@ def solve_static_polaron(
         state,
         parameters,
         solver=solver,
+        gradient_mode=gradient_mode,
         stop_when_all_coordinates_converge=not legacy_convergence,
     )
     density = output.ground_state.charge_density.reshape(
