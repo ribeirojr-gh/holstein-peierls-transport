@@ -195,9 +195,9 @@ def main() -> None:
         parameters,
         pair_position=center_position(args.size),
         max_iterations=args.max_iterations,
-        convergence_criterion=1.0e-6,
-        gradient_convergence_criterion=2.0e-5,
-        eigensolver_tolerance=2.0e-9,
+        convergence_criterion=1.0e-8,
+        gradient_convergence_criterion=1.0e-6,
+        eigensolver_tolerance=1.0e-11,
     )
 
     result = relax_seeded(parameters, branch=args.branch)
@@ -222,6 +222,9 @@ def main() -> None:
         "converged": result.diagnostics.converged,
         "final_max_update_A": result.diagnostics.final_max_update,
         "final_max_gradient_eV_per_A": result.diagnostics.final_max_gradient,
+        "convergence_criterion_A": parameters.convergence_criterion,
+        "gradient_convergence_criterion_eV_per_A": parameters.gradient_convergence_criterion,
+        "eigensolver_tolerance": parameters.eigensolver_tolerance,
     }
 
     args.output.mkdir(parents=True, exist_ok=True)
@@ -229,6 +232,12 @@ def main() -> None:
     output.write_text(json.dumps(record, indent=2) + "\n")
     print(json.dumps(record, sort_keys=True))
     print(f"JSON: {output}")
+
+    if not result.diagnostics.converged:
+        raise SystemExit(
+            "strict 40x40 branch validation did not converge within "
+            f"{parameters.max_iterations} iterations"
+        )
 
 
 if __name__ == "__main__":
