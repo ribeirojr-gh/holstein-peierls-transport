@@ -8,35 +8,27 @@ on:
   workflow_dispatch:
 
 jobs:
-  size-check:
+  refine-size20:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - label: u1000-v0060
+          - label: u1000-v0070
             U: 1.000
-            V1: 0.0060
+            V1: 0.0070
             branches: 'intersite_x separated'
-          - label: u1000-v0065
+          - label: u1000-v0075
             U: 1.000
-            V1: 0.0065
+            V1: 0.0075
             branches: 'intersite_x separated'
-          - label: u0525-v026
+          - label: u0525-v029
             U: 0.525
-            V1: 0.026
+            V1: 0.029
             branches: 'intersite_x onsite separated'
-          - label: u0525-v028
+          - label: u0525-v030
             U: 0.525
-            V1: 0.028
+            V1: 0.030
             branches: 'intersite_x onsite separated'
-          - label: u0525-v180
-            U: 0.525
-            V1: 0.180
-            branches: 'onsite separated'
-          - label: u0525-v185
-            U: 0.525
-            V1: 0.185
-            branches: 'onsite separated'
     runs-on: ubuntu-latest
     env:
       OMP_NUM_THREADS: 1
@@ -49,7 +41,7 @@ jobs:
           python-version: '3.12'
       - name: Install package
         run: python -m pip install -e '.[dev]'
-      - name: Run targeted 20x20 V1 branch comparison
+      - name: Run refined 20x20 V1 branch comparison
         run: >-
           python experiments/bipolaron_v1_scan.py
           --size 20
