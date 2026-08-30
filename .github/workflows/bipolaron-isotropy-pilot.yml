@@ -8,179 +8,99 @@ on:
   workflow_dispatch:
 
 jobs:
-  strict-size20:
+  strict-size20-refinement:
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Fixed-bandwidth eta crossing, U=0.525: intersite-x vs onsite.
-          - label: eta079-u0525-x
-            Jx: 0.064245810055866
-            Jy: 0.050754189944134
+          # Reuse eta=0.80 from the previous strict run; evaluate the opposite side.
+          - label: eta082-u0525-x
+            Jx: 0.0631868131868132
+            Jy: 0.0518131868131868
             ax: 0.10
             ay: 0.12
             U: 0.525
             V1: 0.0
             branch: intersite_x
-          - label: eta079-u0525-on
-            Jx: 0.064245810055866
-            Jy: 0.050754189944134
-            ax: 0.10
-            ay: 0.12
-            U: 0.525
-            V1: 0.0
-            branch: onsite
-          - label: eta080-u0525-x
-            Jx: 0.063888888888889
-            Jy: 0.051111111111111
-            ax: 0.10
-            ay: 0.12
-            U: 0.525
-            V1: 0.0
-            branch: intersite_x
-          - label: eta080-u0525-on
-            Jx: 0.063888888888889
-            Jy: 0.051111111111111
+          - label: eta082-u0525-on
+            Jx: 0.0631868131868132
+            Jy: 0.0518131868131868
             ax: 0.10
             ay: 0.12
             U: 0.525
             V1: 0.0
             branch: onsite
 
-          # Fixed-bandwidth orientation crossing, U=1: x vs y.
-          - label: eta087-u1000-x
-            Jx: 0.061497326203208
-            Jy: 0.053502673796791
+          # Reuse eta=0.87 from the previous strict run; evaluate the opposite side.
+          - label: eta085-u1000-x
+            Jx: 0.0621621621621622
+            Jy: 0.0528378378378378
             ax: 0.10
             ay: 0.12
             U: 1.0
             V1: 0.0
             branch: intersite_x
-          - label: eta087-u1000-y
-            Jx: 0.061497326203208
-            Jy: 0.053502673796791
-            ax: 0.10
-            ay: 0.12
-            U: 1.0
-            V1: 0.0
-            branch: intersite_y
-          - label: eta088-u1000-x
-            Jx: 0.061170212765957
-            Jy: 0.053829787234042
-            ax: 0.10
-            ay: 0.12
-            U: 1.0
-            V1: 0.0
-            branch: intersite_x
-          - label: eta088-u1000-y
-            Jx: 0.061170212765957
-            Jy: 0.053829787234042
+          - label: eta085-u1000-y
+            Jx: 0.0621621621621622
+            Jy: 0.0528378378378378
             ax: 0.10
             ay: 0.12
             U: 1.0
             V1: 0.0
             branch: intersite_y
 
-          # Fully isotropic U=1: axial vs diagonal.
-          - label: fulliso-u1000-v0030-x
+          # Reuse V1=3.2 meV; evaluate the diagonal-favoured side.
+          - label: fulliso-u1000-v0036-x
             Jx: 0.0575
             Jy: 0.0575
             ax: 0.10
             ay: 0.10
             U: 1.0
-            V1: 0.0030
+            V1: 0.0036
             branch: intersite_x
-          - label: fulliso-u1000-v0030-diag
+          - label: fulliso-u1000-v0036-diag
             Jx: 0.0575
             Jy: 0.0575
             ax: 0.10
             ay: 0.10
             U: 1.0
-            V1: 0.0030
-            branch: diagonal
-          - label: fulliso-u1000-v0032-x
-            Jx: 0.0575
-            Jy: 0.0575
-            ax: 0.10
-            ay: 0.10
-            U: 1.0
-            V1: 0.0032
-            branch: intersite_x
-          - label: fulliso-u1000-v0032-diag
-            Jx: 0.0575
-            Jy: 0.0575
-            ax: 0.10
-            ay: 0.10
-            U: 1.0
-            V1: 0.0032
+            V1: 0.0036
             branch: diagonal
 
-          # Fully isotropic U=1: diagonal vs separated.
-          - label: fulliso-u1000-v0148-diag
+          # Reuse V1=15.0 meV; evaluate the separated-favoured side.
+          - label: fulliso-u1000-v0160-diag
             Jx: 0.0575
             Jy: 0.0575
             ax: 0.10
             ay: 0.10
             U: 1.0
-            V1: 0.0148
+            V1: 0.0160
             branch: diagonal
-          - label: fulliso-u1000-v0148-sep
+          - label: fulliso-u1000-v0160-sep
             Jx: 0.0575
             Jy: 0.0575
             ax: 0.10
             ay: 0.10
             U: 1.0
-            V1: 0.0148
-            branch: separated
-          - label: fulliso-u1000-v0150-diag
-            Jx: 0.0575
-            Jy: 0.0575
-            ax: 0.10
-            ay: 0.10
-            U: 1.0
-            V1: 0.0150
-            branch: diagonal
-          - label: fulliso-u1000-v0150-sep
-            Jx: 0.0575
-            Jy: 0.0575
-            ax: 0.10
-            ay: 0.10
-            U: 1.0
-            V1: 0.0150
+            V1: 0.0160
             branch: separated
 
-          # Fully isotropic U=0.525: onsite vs separated.
-          - label: fulliso-u0525-v310-on
+          # Reuse V1=310 meV; evaluate the onsite-favoured side.
+          - label: fulliso-u0525-v309-on
             Jx: 0.0575
             Jy: 0.0575
             ax: 0.10
             ay: 0.10
             U: 0.525
-            V1: 0.310
+            V1: 0.309
             branch: onsite
-          - label: fulliso-u0525-v310-sep
+          - label: fulliso-u0525-v309-sep
             Jx: 0.0575
             Jy: 0.0575
             ax: 0.10
             ay: 0.10
             U: 0.525
-            V1: 0.310
-            branch: separated
-          - label: fulliso-u0525-v320-on
-            Jx: 0.0575
-            Jy: 0.0575
-            ax: 0.10
-            ay: 0.10
-            U: 0.525
-            V1: 0.320
-            branch: onsite
-          - label: fulliso-u0525-v320-sep
-            Jx: 0.0575
-            Jy: 0.0575
-            ax: 0.10
-            ay: 0.10
-            U: 0.525
-            V1: 0.320
+            V1: 0.309
             branch: separated
     runs-on: ubuntu-latest
     env:
