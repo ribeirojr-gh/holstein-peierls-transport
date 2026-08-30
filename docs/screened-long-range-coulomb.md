@@ -74,6 +74,20 @@ This approximation deliberately separates validation of the electronic long-rang
 
 would require additional analytic Coulomb contributions to the `vx` and `vy` gradients and will be considered only after the frozen-distance model is numerically characterized.
 
+## Interpretation of screening controls
+
+The first parameter scans are model controls, not material fits. The most transparent interaction scales are
+
+`Vx = 14.3996454784255 / (epsilon_r a_x)` eV,
+
+`Vy = 14.3996454784255 / (epsilon_r a_y)` eV,
+
+and
+
+`Vdiag = 14.3996454784255 / (epsilon_r sqrt(a_x^2 + a_y^2))` eV.
+
+These quantities should be reported alongside `a_x`, `a_y`, and `epsilon_r`. In particular, comparison with the validated `U + V1` phase boundaries should be made through these actual energy scales rather than by treating `epsilon_r` alone as a universal coupling parameter.
+
 ## Literature context
 
 Electronic polarization is a major contribution to charge energetics in molecular crystals. Tsiper and Soos reported strong solid-state polarization in pentacene and an optical dielectric tensor for the neutral crystal (Phys. Rev. B 68, 085301, 2003; DOI 10.1103/PhysRevB.68.085301). Ha, Qi, and Kahn extracted an approximate relative permittivity near 2.8 from STM line profiles in doped pentacene films (Chem. Phys. Lett. 495, 212-217, 2010; DOI 10.1016/j.cplett.2010.06.085).
