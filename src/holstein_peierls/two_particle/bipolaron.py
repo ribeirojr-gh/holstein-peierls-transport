@@ -1,4 +1,4 @@
-"""Matrix-free adiabatic Holstein-Hubbard singlet bipolaron solver.
+"""Matrix-free adiabatic extended Holstein-Hubbard singlet bipolaron solver.
 
 The two-particle wavefunction is represented as ``psi[i, j]`` on the ordered
 site-product basis. We remain in the spin-singlet sector by starting the
@@ -6,9 +6,9 @@ Krylov iteration with a symmetric vector; the Hamiltonian preserves particle
 exchange symmetry. The returned state is explicitly symmetrized to remove
 round-off-level antisymmetric contamination.
 
-This module deliberately contains *only* the intramolecular Holstein coordinate
-``u`` and an on-site Hubbard repulsion ``U``. Peierls coupling is added only
-after this reference problem passes its analytic and numerical regressions.
+This module contains the intramolecular Holstein coordinate ``u`` and the
+extended-Hubbard interaction sector. Peierls lattice coordinates are activated
+in :mod:`holstein_peierls.two_particle.peierls`.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from numpy.typing import NDArray
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse.linalg import LinearOperator, eigsh
 
+from .interaction import pair_interaction_matrix
 from .parameters import BipolaronParameters
 
 FloatArray = NDArray[np.float64]
@@ -107,8 +108,6 @@ def build_one_particle_hamiltonian(
     n = parameters.n_sites
     diagonal = parameters.alpha_intra * u.ravel(order="C")
 
-    # Avoid duplicate-bond ambiguity for very small periodic dimensions by
-    # assigning a dense reference matrix exactly once per directed neighbour.
     if parameters.nx < 3 or parameters.ny < 3:
         h = np.zeros((n, n), dtype=np.float64)
         np.fill_diagonal(h, diagonal)
@@ -140,15 +139,13 @@ def build_one_particle_hamiltonian(
 def _apply_two_particle_hamiltonian(
     psi: FloatArray,
     one_particle_hamiltonian: csr_matrix,
-    hubbard_u: float,
+    interaction: FloatArray,
 ) -> FloatArray:
-    """Apply ``H1⊗I + I⊗H1 + U delta_ij`` without forming an N^2 matrix."""
+    """Apply ``H1⊗I + I⊗H1 + V_ij`` without forming an N^2 matrix."""
     left = one_particle_hamiltonian @ psi
     right = (one_particle_hamiltonian @ psi.T).T
     result = np.asarray(left + right, dtype=np.float64)
-    if hubbard_u != 0.0:
-        diagonal = np.diag_indices_from(result)
-        result[diagonal] += hubbard_u * psi[diagonal]
+    result += interaction * psi
     return result
 
 
@@ -158,13 +155,12 @@ def two_particle_linear_operator(
 ) -> LinearOperator:
     """Return the matrix-free two-particle Hamiltonian as a LinearOperator."""
     h1 = build_one_particle_hamiltonian(u, parameters)
+    interaction = pair_interaction_matrix(parameters)
     n = parameters.n_sites
 
     def matvec(vector: FloatArray) -> FloatArray:
         psi = np.asarray(vector, dtype=np.float64).reshape((n, n), order="C")
-        return _apply_two_particle_hamiltonian(psi, h1, parameters.hubbard_u).ravel(
-            order="C"
-        )
+        return _apply_two_particle_hamiltonian(psi, h1, interaction).ravel(order="C")
 
     return LinearOperator((n * n, n * n), matvec=matvec, dtype=np.float64)
 
@@ -213,8 +209,6 @@ def solve_bipolaron_ground_state(
         maxiter=parameters.eigensolver_max_iterations,
     )
     psi = _normalize_symmetric_wavefunction(eigenvectors[:, 0].reshape((n, n)))
-
-    # Recompute the Rayleigh quotient after explicit singlet projection.
     applied = operator @ psi.ravel(order="C")
     energy = float(np.dot(psi.ravel(order="C"), applied))
     return BipolaronGroundState(energy=energy, wavefunction=psi)
@@ -265,14 +259,15 @@ def expectation_energy(
         np.asarray(wavefunction, dtype=np.float64).reshape((n, n))
     )
     h1 = build_one_particle_hamiltonian(u, parameters)
-    applied = _apply_two_particle_hamiltonian(psi, h1, parameters.hubbard_u)
+    interaction = pair_interaction_matrix(parameters)
+    applied = _apply_two_particle_hamiltonian(psi, h1, interaction)
     electronic = float(np.sum(psi * applied))
     lattice = 0.5 * parameters.k1 * float(np.sum(np.square(u)))
     return BipolaronEnergy(electronic, lattice, electronic + lattice)
 
 
 def atomic_limit_binding_energy(parameters: BipolaronParameters) -> float:
-    """Analytic onsite-vs-separated binding energy A^2/K1 - U at J=0."""
+    """Analytic onsite-vs-far-separated binding energy at J=0."""
     return parameters.atomic_holstein_pairing_scale - parameters.hubbard_u
 
 

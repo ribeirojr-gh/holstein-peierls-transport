@@ -14,8 +14,10 @@ class BipolaronParameters:
 
     Energies are in eV and displacements in angstrom, matching the validated
     single-polaron implementation. ``gradient_convergence_criterion`` is in
-    eV/angstrom. The Holstein-only reference solver ignores ``k2`` and the
-    intermolecular coupling constants; the Peierls extension activates them.
+    eV/angstrom. The interaction sector contains onsite ``hubbard_u`` and an
+    optional positive nearest-neighbour repulsion ``nearest_neighbor_v``.
+    The Holstein-only reference solver ignores ``k2`` and the intermolecular
+    coupling constants; the Peierls extension activates them.
     """
 
     nx: int = 20
@@ -28,6 +30,7 @@ class BipolaronParameters:
     alpha_interx: float = 0.4
     alpha_intery: float = 0.4
     hubbard_u: float = 0.0
+    nearest_neighbor_v: float = 0.0
     pair_position: int = 205
     max_iterations: int = 2000
     update_start: float = 1.0e-3
@@ -68,6 +71,7 @@ class BipolaronParameters:
         parameters: StaticPolaronParameters,
         *,
         hubbard_u: float = 0.0,
+        nearest_neighbor_v: float = 0.0,
     ) -> "BipolaronParameters":
         """Create a two-particle parameter set from a validated polaron input."""
         return cls(
@@ -81,6 +85,7 @@ class BipolaronParameters:
             alpha_interx=parameters.alpha_interx,
             alpha_intery=parameters.alpha_intery,
             hubbard_u=hubbard_u,
+            nearest_neighbor_v=nearest_neighbor_v,
             pair_position=parameters.polaron_position,
             max_iterations=parameters.max_iterations,
             update_start=parameters.update_start,

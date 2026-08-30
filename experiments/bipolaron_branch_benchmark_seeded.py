@@ -1,11 +1,10 @@
 """Large-cell branch benchmark with a branch-consistent initial Krylov vector.
 
 The physical Hamiltonian, RPROP update, convergence tolerances, and eigensolver
-are identical to the production experimental two-particle solver. The only
-change is the first ``eigsh`` starting vector: it is chosen to match the
-intersite-x or separated branch being validated. Subsequent electronic solves
-continue to use the previous converged eigenvector exactly as in the core
-relaxation routine.
+are identical to the experimental two-particle solver. The only numerical
+specialization is the first ``eigsh`` starting vector, chosen to match the
+onsite, intersite-x, intersite-y, diagonal, or separated branch under
+validation. Subsequent solves reuse the preceding converged eigenvector.
 """
 
 from __future__ import annotations
@@ -20,6 +19,10 @@ import numpy as np
 from holstein_peierls.lattice import LatticeState
 from holstein_peierls.parameters import StaticPolaronParameters
 from holstein_peierls.two_particle.bipolaron import BipolaronRelaxationDiagnostics
+from holstein_peierls.two_particle.interaction import (
+    interaction_expectation,
+    minimum_image_offsets,
+)
 from holstein_peierls.two_particle.observables import pair_observables
 from holstein_peierls.two_particle.parameters import BipolaronParameters
 from holstein_peierls.two_particle.peierls import (
@@ -30,6 +33,8 @@ from holstein_peierls.two_particle.peierls import (
     total_energy,
 )
 
+BRANCHES = ("onsite", "intersite_x", "intersite_y", "diagonal", "separated")
+
 
 def center_position(size: int) -> int:
     return (size // 2) * size + (size // 2) + 1
@@ -38,8 +43,17 @@ def center_position(size: int) -> int:
 def branch_indices(parameters: BipolaronParameters, branch: str) -> tuple[int, int]:
     first = parameters.pair_index
     cy, cx = divmod(first, parameters.nx)
-    if branch == "intersite_x":
+    if branch == "onsite":
+        second = first
+    elif branch == "intersite_x":
         second = cy * parameters.nx + (cx + 1) % parameters.nx
+    elif branch == "intersite_y":
+        second = ((cy + 1) % parameters.ny) * parameters.nx + cx
+    elif branch == "diagonal":
+        second = (
+            ((cy + 1) % parameters.ny) * parameters.nx
+            + (cx + 1) % parameters.nx
+        )
     elif branch == "separated":
         second = (
             ((cy + parameters.ny // 2) % parameters.ny) * parameters.nx
@@ -53,10 +67,14 @@ def branch_indices(parameters: BipolaronParameters, branch: str) -> tuple[int, i
 def branch_seed(parameters: BipolaronParameters, branch: str) -> LatticeState:
     u = np.zeros((parameters.ny, parameters.nx), dtype=float)
     first, second = branch_indices(parameters, branch)
-    displacement = -parameters.alpha_intra / parameters.k1
-    for site in (first, second):
-        y, x = divmod(site, parameters.nx)
-        u[y, x] = displacement
+    if first == second:
+        y, x = divmod(first, parameters.nx)
+        u[y, x] = -2.0 * parameters.alpha_intra / parameters.k1
+    else:
+        displacement = -parameters.alpha_intra / parameters.k1
+        for site in (first, second):
+            y, x = divmod(site, parameters.nx)
+            u[y, x] = displacement
     return LatticeState(u=u, vx=np.zeros_like(u), vy=np.zeros_like(u))
 
 
@@ -72,12 +90,21 @@ def branch_wavefunction(parameters: BipolaronParameters, branch: str) -> np.ndar
     return psi
 
 
+def diagonal_probability(
+    wavefunction: np.ndarray,
+    parameters: BipolaronParameters,
+) -> float:
+    dx, dy = minimum_image_offsets(parameters)
+    mask = (dx == 1) & (dy == 1)
+    return float(np.sum(np.square(wavefunction)[mask]))
+
+
 def relax_seeded(
     parameters: BipolaronParameters,
     *,
     branch: str,
 ) -> HolsteinPeierlsBipolaronResult:
-    """Replicate the core relaxation with only the first Krylov vector changed."""
+    """Replicate core relaxation with only the first Krylov vector specialized."""
     lattice = branch_seed(parameters, branch)
     previous_u = np.zeros_like(lattice.u)
     previous_vx = np.zeros_like(lattice.vx)
@@ -176,7 +203,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--size", type=int, required=True)
     parser.add_argument("--u", type=float, required=True)
-    parser.add_argument("--branch", choices=("intersite_x", "separated"), required=True)
+    parser.add_argument("--v1", type=float, default=0.0)
+    parser.add_argument("--branch", choices=BRANCHES, required=True)
+    parser.add_argument("--j0x", type=float, default=0.100)
+    parser.add_argument("--j0y", type=float, default=0.015)
     parser.add_argument("--alpha-x", type=float, default=0.10)
     parser.add_argument("--alpha-y", type=float, default=0.12)
     parser.add_argument("--max-iterations", type=int, default=1200)
@@ -187,10 +217,16 @@ def main() -> None:
         nx=args.size,
         ny=args.size,
         polaron_position=center_position(args.size),
+        j0x=args.j0x,
+        j0y=args.j0y,
         alpha_interx=args.alpha_x,
         alpha_intery=args.alpha_y,
     )
-    parameters = BipolaronParameters.from_polaron_parameters(single, hubbard_u=args.u)
+    parameters = BipolaronParameters.from_polaron_parameters(
+        single,
+        hubbard_u=args.u,
+        nearest_neighbor_v=args.v1,
+    )
     parameters = replace(
         parameters,
         pair_position=center_position(args.size),
@@ -202,17 +238,25 @@ def main() -> None:
 
     result = relax_seeded(parameters, branch=args.branch)
     obs = pair_observables(result.ground_state, parameters)
+    pdiag = diagonal_probability(result.ground_state.wavefunction, parameters)
     ratio_x, ratio_y = distortion_ratios(result, parameters)
+    eint = interaction_expectation(result.ground_state.wavefunction, parameters)
     record = {
         "size": args.size,
+        "Jx_eV": args.j0x,
+        "Jy_eV": args.j0y,
         "alpha_x_eV_per_A": args.alpha_x,
         "alpha_y_eV_per_A": args.alpha_y,
         "U_eV": args.u,
+        "V1_eV": args.v1,
         "branch": args.branch,
         "total_energy_eV": result.energy.total,
+        "interaction_energy_eV": eint,
         "P_onsite": obs.onsite_probability,
+        "P_nn": obs.nearest_neighbour_probability,
         "P_nn_x": obs.nearest_neighbour_x_probability,
         "P_nn_y": obs.nearest_neighbour_y_probability,
+        "P_diagonal": pdiag,
         "mean_r": obs.mean_separation,
         "rms_r": obs.rms_separation,
         "one_body_ipr": obs.one_body_ipr,
@@ -235,7 +279,7 @@ def main() -> None:
 
     if not result.diagnostics.converged:
         raise SystemExit(
-            "strict 40x40 branch validation did not converge within "
+            "strict large-cell branch validation did not converge within "
             f"{parameters.max_iterations} iterations"
         )
 

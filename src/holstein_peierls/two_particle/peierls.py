@@ -1,11 +1,12 @@
-"""Static singlet Holstein-Peierls-Hubbard bipolaron solver.
+"""Static singlet extended Holstein-Peierls-Hubbard bipolaron solver.
 
-This module activates the intermolecular lattice coordinates only after the
-Holstein-Hubbard reference problem has been validated. The one-particle bond
-Hamiltonian follows the same sign and periodic-index convention as the
-production single-polaron solver. Electronic forces are obtained by replacing
-the one-particle density matrix with the spin-summed one-body reduced density
-matrix of the correlated two-particle singlet.
+The one-particle bond Hamiltonian follows the same sign and periodic-index
+convention as the validated single-polaron solver. Electronic forces are
+obtained by replacing the one-particle density matrix with the spin-summed
+one-body reduced density matrix of the correlated two-particle singlet.
+The pair interaction is currently lattice-geometry independent: onsite U and
+nearest-neighbour V1 alter the electronic state but add no explicit classical
+force beyond their effect on that state.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from .bipolaron import (
     _normalize_symmetric_wavefunction,
     initial_distortion,
 )
+from .interaction import pair_interaction_matrix
 from .parameters import BipolaronParameters
 
 FloatArray = NDArray[np.float64]
@@ -120,8 +122,6 @@ def build_one_particle_hamiltonian(
     diagonal = parameters.alpha_intra * state.u.ravel(order="C")
     tx, ty = bond_transfer_integrals(state, parameters)
 
-    # Match the validated single-particle assignment semantics for very small
-    # periodic dimensions, where directed neighbour lists contain duplicates.
     if parameters.nx < 3 or parameters.ny < 3:
         h = np.zeros((n, n), dtype=np.float64)
         np.fill_diagonal(h, diagonal)
@@ -148,15 +148,14 @@ def two_particle_linear_operator(
     state: LatticeState,
     parameters: BipolaronParameters,
 ) -> LinearOperator:
-    """Return ``H1(q) tensor I + I tensor H1(q) + U delta_ij`` matrix-free."""
+    """Return ``H1(q) tensor I + I tensor H1(q) + V_ij`` matrix-free."""
     h1 = build_one_particle_hamiltonian(state, parameters)
+    interaction = pair_interaction_matrix(parameters)
     n = parameters.n_sites
 
     def matvec(vector: FloatArray) -> FloatArray:
         psi = np.asarray(vector, dtype=np.float64).reshape((n, n), order="C")
-        return _apply_two_particle_hamiltonian(psi, h1, parameters.hubbard_u).ravel(
-            order="C"
-        )
+        return _apply_two_particle_hamiltonian(psi, h1, interaction).ravel(order="C")
 
     return LinearOperator((n * n, n * n), matvec=matvec, dtype=np.float64)
 
@@ -233,12 +232,7 @@ def energy_gradient(
     *,
     ground_state: BipolaronGroundState | None = None,
 ) -> tuple[BipolaronLatticeGradient, BipolaronGroundState]:
-    """Hellmann-Feynman gradient for all three classical lattice fields.
-
-    For the Peierls terms this is exactly the optimized one-polaron gradient
-    with ``rho`` replaced by the spin-summed one-body density matrix ``gamma``.
-    ``gamma`` has trace two, so no additional occupation factor is required.
-    """
+    """Hellmann-Feynman gradient for all three classical lattice fields."""
     _validate_lattice(state, parameters)
     if ground_state is None:
         ground_state = solve_holstein_peierls_ground_state(state, parameters)
