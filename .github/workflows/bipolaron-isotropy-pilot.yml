@@ -8,47 +8,15 @@ on:
   workflow_dispatch:
 
 jobs:
-  scan:
+  refined-eta:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - label: u0525-trajectory
+          - label: u0525-refined-eta
             U: 0.525
-            hopping_sum: 0.115
-            eta_values: "0.15 0.25 0.50 0.75 1.00"
-            alpha_x: 0.10
-            alpha_y: 0.12
-          - label: u1000-trajectory
+          - label: u1000-refined-eta
             U: 1.000
-            hopping_sum: 0.115
-            eta_values: "0.15 0.25 0.50 0.75 1.00"
-            alpha_x: 0.10
-            alpha_y: 0.12
-          - label: u0525-full-isotropic
-            U: 0.525
-            hopping_sum: 0.115
-            eta_values: "1.00"
-            alpha_x: 0.10
-            alpha_y: 0.10
-          - label: u1000-full-isotropic
-            U: 1.000
-            hopping_sum: 0.115
-            eta_values: "1.00"
-            alpha_x: 0.10
-            alpha_y: 0.10
-          - label: u0525-high-bandwidth-isotropic
-            U: 0.525
-            hopping_sum: 0.200
-            eta_values: "1.00"
-            alpha_x: 0.10
-            alpha_y: 0.12
-          - label: u1000-high-bandwidth-isotropic
-            U: 1.000
-            hopping_sum: 0.200
-            eta_values: "1.00"
-            alpha_x: 0.10
-            alpha_y: 0.12
     runs-on: ubuntu-latest
     env:
       OMP_NUM_THREADS: 1
@@ -61,16 +29,16 @@ jobs:
           python-version: '3.12'
       - name: Install package
         run: python -m pip install -e '.[dev]'
-      - name: Run 10x10 anisotropy scan
+      - name: Refine fixed-bandwidth anisotropy crossing
         run: >-
           python experiments/bipolaron_anisotropy_scan.py
           --size 10
           --u ${{ matrix.U }}
           --v1 0.0
-          --hopping-sum ${{ matrix.hopping_sum }}
-          --eta-values ${{ matrix.eta_values }}
-          --alpha-x ${{ matrix.alpha_x }}
-          --alpha-y ${{ matrix.alpha_y }}
+          --hopping-sum 0.115
+          --eta-values 0.80 0.85 0.90 0.95
+          --alpha-x 0.10
+          --alpha-y 0.12
           --max-iterations 1200
           --output isotropy-${{ matrix.label }}
       - uses: actions/upload-artifact@v4
