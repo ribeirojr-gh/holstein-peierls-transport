@@ -8,27 +8,59 @@ on:
   workflow_dispatch:
 
 jobs:
-  refine-size20:
+  strict-size40:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - label: u1000-v0070
-            U: 1.000
-            V1: 0.0070
-            branches: 'intersite_x separated'
-          - label: u1000-v0075
+          - label: u1000-v0075-x
             U: 1.000
             V1: 0.0075
-            branches: 'intersite_x separated'
-          - label: u0525-v029
+            branch: intersite_x
+          - label: u1000-v0075-sep
+            U: 1.000
+            V1: 0.0075
+            branch: separated
+          - label: u1000-v0080-x
+            U: 1.000
+            V1: 0.0080
+            branch: intersite_x
+          - label: u1000-v0080-sep
+            U: 1.000
+            V1: 0.0080
+            branch: separated
+          - label: u0525-v029-x
             U: 0.525
             V1: 0.029
-            branches: 'intersite_x onsite separated'
-          - label: u0525-v030
+            branch: intersite_x
+          - label: u0525-v029-on
+            U: 0.525
+            V1: 0.029
+            branch: onsite
+          - label: u0525-v030-x
             U: 0.525
             V1: 0.030
-            branches: 'intersite_x onsite separated'
+            branch: intersite_x
+          - label: u0525-v030-on
+            U: 0.525
+            V1: 0.030
+            branch: onsite
+          - label: u0525-v184-on
+            U: 0.525
+            V1: 0.184
+            branch: onsite
+          - label: u0525-v184-sep
+            U: 0.525
+            V1: 0.184
+            branch: separated
+          - label: u0525-v186-on
+            U: 0.525
+            V1: 0.186
+            branch: onsite
+          - label: u0525-v186-sep
+            U: 0.525
+            V1: 0.186
+            branch: separated
     runs-on: ubuntu-latest
     env:
       OMP_NUM_THREADS: 1
@@ -41,18 +73,19 @@ jobs:
           python-version: '3.12'
       - name: Install package
         run: python -m pip install -e '.[dev]'
-      - name: Run refined 20x20 V1 branch comparison
+      - name: Run strict 40x40 branch benchmark
         run: >-
-          python experiments/bipolaron_v1_scan.py
-          --size 20
-          --u-values ${{ matrix.U }}
-          --v1-values ${{ matrix.V1 }}
-          --branches ${{ matrix.branches }}
+          python experiments/bipolaron_branch_benchmark_seeded.py
+          --size 40
+          --u ${{ matrix.U }}
+          --v1 ${{ matrix.V1 }}
+          --branch ${{ matrix.branch }}
           --alpha-x 0.10
           --alpha-y 0.12
-          --output size20-${{ matrix.label }}
+          --max-iterations 1200
+          --output strict40-${{ matrix.label }}
       - uses: actions/upload-artifact@v4
         with:
-          name: bipolaron-v1-size20-${{ matrix.label }}
-          path: size20-${{ matrix.label }}
+          name: bipolaron-v1-strict40-${{ matrix.label }}
+          path: strict40-${{ matrix.label }}
           if-no-files-found: error
