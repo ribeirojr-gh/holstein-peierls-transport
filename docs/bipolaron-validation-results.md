@@ -35,6 +35,12 @@ The final 40x40 validation used the solver tolerances directly:
 
 All four final 40x40 branches converged within 1200 RPROP iterations. The final residual gradients were of order `3e-8 eV/angstrom`, substantially below the declared threshold.
 
+### RPROP convention
+
+The two-particle solver uses a non-backtracking RPROP variant: when a gradient component changes sign, its step size is reduced and that coordinate receives no update on that iteration. This differs deliberately from the archived single-polaron compatibility path, which rolls back the previous coordinate step on a sign reversal. Consequently, two-particle and legacy one-particle iteration counts or optimization trajectories should not be compared directly. Validation is based on stationary energies, residual gradients, pair observables, analytic limits, and finite-size behavior rather than reproducing the historical RPROP path.
+
+Several scripts in `experiments/` retain looser tolerances because they document exploratory scans used to identify branches and parameter windows. The authoritative large-cell benchmark is `experiments/bipolaron_branch_benchmark_seeded.py`, which uses the strict tolerances listed above and fails explicitly if a branch does not converge.
+
 ## Reference parameter set
 
 The finite-size validation reported below used:
