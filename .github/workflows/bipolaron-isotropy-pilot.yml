@@ -8,27 +8,180 @@ on:
   workflow_dispatch:
 
 jobs:
-  v1-map:
+  strict-size20:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - label: u0525-fulliso-refined
+          # Fixed-bandwidth eta crossing, U=0.525: intersite-x vs onsite.
+          - label: eta079-u0525-x
+            Jx: 0.064245810055866
+            Jy: 0.050754189944134
+            ax: 0.10
+            ay: 0.12
             U: 0.525
-            v1_values: "0.280 0.300 0.310 0.320 0.340"
-            alpha_y: 0.10
-          - label: u1000-fulliso-refined
-            U: 1.000
-            v1_values: "0.0030 0.0031 0.0032 0.0145 0.0148 0.0150"
-            alpha_y: 0.10
-          - label: u0525-hopping-only-isotropic
+            V1: 0.0
+            branch: intersite_x
+          - label: eta079-u0525-on
+            Jx: 0.064245810055866
+            Jy: 0.050754189944134
+            ax: 0.10
+            ay: 0.12
             U: 0.525
-            v1_values: "0.000 0.050 0.100 0.150 0.200 0.250 0.300 0.350"
-            alpha_y: 0.12
-          - label: u1000-hopping-only-isotropic
-            U: 1.000
-            v1_values: "0.000 0.002 0.004 0.006 0.010 0.015 0.020 0.030"
-            alpha_y: 0.12
+            V1: 0.0
+            branch: onsite
+          - label: eta080-u0525-x
+            Jx: 0.063888888888889
+            Jy: 0.051111111111111
+            ax: 0.10
+            ay: 0.12
+            U: 0.525
+            V1: 0.0
+            branch: intersite_x
+          - label: eta080-u0525-on
+            Jx: 0.063888888888889
+            Jy: 0.051111111111111
+            ax: 0.10
+            ay: 0.12
+            U: 0.525
+            V1: 0.0
+            branch: onsite
+
+          # Fixed-bandwidth orientation crossing, U=1: x vs y.
+          - label: eta087-u1000-x
+            Jx: 0.061497326203208
+            Jy: 0.053502673796791
+            ax: 0.10
+            ay: 0.12
+            U: 1.0
+            V1: 0.0
+            branch: intersite_x
+          - label: eta087-u1000-y
+            Jx: 0.061497326203208
+            Jy: 0.053502673796791
+            ax: 0.10
+            ay: 0.12
+            U: 1.0
+            V1: 0.0
+            branch: intersite_y
+          - label: eta088-u1000-x
+            Jx: 0.061170212765957
+            Jy: 0.053829787234042
+            ax: 0.10
+            ay: 0.12
+            U: 1.0
+            V1: 0.0
+            branch: intersite_x
+          - label: eta088-u1000-y
+            Jx: 0.061170212765957
+            Jy: 0.053829787234042
+            ax: 0.10
+            ay: 0.12
+            U: 1.0
+            V1: 0.0
+            branch: intersite_y
+
+          # Fully isotropic U=1: axial vs diagonal.
+          - label: fulliso-u1000-v0030-x
+            Jx: 0.0575
+            Jy: 0.0575
+            ax: 0.10
+            ay: 0.10
+            U: 1.0
+            V1: 0.0030
+            branch: intersite_x
+          - label: fulliso-u1000-v0030-diag
+            Jx: 0.0575
+            Jy: 0.0575
+            ax: 0.10
+            ay: 0.10
+            U: 1.0
+            V1: 0.0030
+            branch: diagonal
+          - label: fulliso-u1000-v0032-x
+            Jx: 0.0575
+            Jy: 0.0575
+            ax: 0.10
+            ay: 0.10
+            U: 1.0
+            V1: 0.0032
+            branch: intersite_x
+          - label: fulliso-u1000-v0032-diag
+            Jx: 0.0575
+            Jy: 0.0575
+            ax: 0.10
+            ay: 0.10
+            U: 1.0
+            V1: 0.0032
+            branch: diagonal
+
+          # Fully isotropic U=1: diagonal vs separated.
+          - label: fulliso-u1000-v0148-diag
+            Jx: 0.0575
+            Jy: 0.0575
+            ax: 0.10
+            ay: 0.10
+            U: 1.0
+            V1: 0.0148
+            branch: diagonal
+          - label: fulliso-u1000-v0148-sep
+            Jx: 0.0575
+            Jy: 0.0575
+            ax: 0.10
+            ay: 0.10
+            U: 1.0
+            V1: 0.0148
+            branch: separated
+          - label: fulliso-u1000-v0150-diag
+            Jx: 0.0575
+            Jy: 0.0575
+            ax: 0.10
+            ay: 0.10
+            U: 1.0
+            V1: 0.0150
+            branch: diagonal
+          - label: fulliso-u1000-v0150-sep
+            Jx: 0.0575
+            Jy: 0.0575
+            ax: 0.10
+            ay: 0.10
+            U: 1.0
+            V1: 0.0150
+            branch: separated
+
+          # Fully isotropic U=0.525: onsite vs separated.
+          - label: fulliso-u0525-v310-on
+            Jx: 0.0575
+            Jy: 0.0575
+            ax: 0.10
+            ay: 0.10
+            U: 0.525
+            V1: 0.310
+            branch: onsite
+          - label: fulliso-u0525-v310-sep
+            Jx: 0.0575
+            Jy: 0.0575
+            ax: 0.10
+            ay: 0.10
+            U: 0.525
+            V1: 0.310
+            branch: separated
+          - label: fulliso-u0525-v320-on
+            Jx: 0.0575
+            Jy: 0.0575
+            ax: 0.10
+            ay: 0.10
+            U: 0.525
+            V1: 0.320
+            branch: onsite
+          - label: fulliso-u0525-v320-sep
+            Jx: 0.0575
+            Jy: 0.0575
+            ax: 0.10
+            ay: 0.10
+            U: 0.525
+            V1: 0.320
+            branch: separated
     runs-on: ubuntu-latest
     env:
       OMP_NUM_THREADS: 1
@@ -41,20 +194,21 @@ jobs:
           python-version: '3.12'
       - name: Install package
         run: python -m pip install -e '.[dev]'
-      - name: Scan isotropic hopping V1 phase structure
+      - name: Run strict seeded 20x20 branch benchmark
         run: >-
-          python experiments/bipolaron_v1_scan.py
-          --size 10
-          --u-values ${{ matrix.U }}
-          --v1-values ${{ matrix.v1_values }}
-          --j0x 0.0575
-          --j0y 0.0575
-          --alpha-x 0.10
-          --alpha-y ${{ matrix.alpha_y }}
+          python experiments/bipolaron_branch_benchmark_seeded.py
+          --size 20
+          --u ${{ matrix.U }}
+          --v1 ${{ matrix.V1 }}
+          --branch ${{ matrix.branch }}
+          --j0x ${{ matrix.Jx }}
+          --j0y ${{ matrix.Jy }}
+          --alpha-x ${{ matrix.ax }}
+          --alpha-y ${{ matrix.ay }}
           --max-iterations 1200
-          --output isotropy-${{ matrix.label }}
+          --output strict20-${{ matrix.label }}
       - uses: actions/upload-artifact@v4
         with:
-          name: bipolaron-isotropy-${{ matrix.label }}
-          path: isotropy-${{ matrix.label }}
+          name: bipolaron-isotropy-strict20-${{ matrix.label }}
+          path: strict20-${{ matrix.label }}
           if-no-files-found: error
