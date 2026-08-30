@@ -1,0 +1,57 @@
+name: bipolaron-isotropy-40x40
+
+on:
+  push:
+    branches: [two-particle-coulomb]
+    paths:
+      - .github/workflows/bipolaron-isotropy-40x40.yml
+  workflow_dispatch:
+
+jobs:
+  strict-size40-isotropic-v1:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {label: u1000-v0033-x, U: 1.0, V1: 0.0033, branch: intersite_x}
+          - {label: u1000-v0033-diag, U: 1.0, V1: 0.0033, branch: diagonal}
+          - {label: u1000-v0037-x, U: 1.0, V1: 0.0037, branch: intersite_x}
+          - {label: u1000-v0037-diag, U: 1.0, V1: 0.0037, branch: diagonal}
+          - {label: u1000-v0150-diag, U: 1.0, V1: 0.0150, branch: diagonal}
+          - {label: u1000-v0150-sep, U: 1.0, V1: 0.0150, branch: separated}
+          - {label: u1000-v0165-diag, U: 1.0, V1: 0.0165, branch: diagonal}
+          - {label: u1000-v0165-sep, U: 1.0, V1: 0.0165, branch: separated}
+          - {label: u0525-v307-on, U: 0.525, V1: 0.307, branch: onsite}
+          - {label: u0525-v307-sep, U: 0.525, V1: 0.307, branch: separated}
+          - {label: u0525-v312-on, U: 0.525, V1: 0.312, branch: onsite}
+          - {label: u0525-v312-sep, U: 0.525, V1: 0.312, branch: separated}
+    runs-on: ubuntu-latest
+    env:
+      OMP_NUM_THREADS: 1
+      OPENBLAS_NUM_THREADS: 1
+      MKL_NUM_THREADS: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install package
+        run: python -m pip install -e '.[dev]'
+      - name: Run strict seeded 40x40 branch benchmark
+        run: >-
+          python experiments/bipolaron_branch_benchmark_seeded.py
+          --size 40
+          --u ${{ matrix.U }}
+          --v1 ${{ matrix.V1 }}
+          --branch ${{ matrix.branch }}
+          --j0x 0.0575
+          --j0y 0.0575
+          --alpha-x 0.10
+          --alpha-y 0.10
+          --max-iterations 2000
+          --output strict40-${{ matrix.label }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bipolaron-isotropy-strict40-${{ matrix.label }}
+          path: strict40-${{ matrix.label }}
+          if-no-files-found: error
