@@ -1,0 +1,41 @@
+name: bipolaron-v1-pilot
+
+on:
+  push:
+    branches: [two-particle-coulomb]
+    paths:
+      - .github/workflows/bipolaron-v1-pilot.yml
+  workflow_dispatch:
+
+jobs:
+  scan:
+    strategy:
+      fail-fast: false
+      matrix:
+        U: [0.525, 1.000]
+    runs-on: ubuntu-latest
+    env:
+      OMP_NUM_THREADS: 1
+      OPENBLAS_NUM_THREADS: 1
+      MKL_NUM_THREADS: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install package
+        run: python -m pip install -e '.[dev]'
+      - name: Run V1 branch scan
+        run: >-
+          python experiments/bipolaron_v1_scan.py
+          --size 10
+          --u-values ${{ matrix.U }}
+          --v1-values 0.0 0.005 0.010 0.020 0.040 0.060 0.080
+          --alpha-x 0.10
+          --alpha-y 0.12
+          --output v1-U${{ matrix.U }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bipolaron-v1-U${{ matrix.U }}
+          path: v1-U${{ matrix.U }}
+          if-no-files-found: error
