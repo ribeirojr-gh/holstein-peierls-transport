@@ -149,3 +149,44 @@ def test_structural_gradient_remains_correct_with_finite_v1() -> None:
         em, _ = total_energy(minus, p)
         numerical = (ep.total - em.total) / (2.0 * epsilon)
         assert np.isclose(analytical, numerical, rtol=4.0e-5, atol=4.0e-7)
+
+
+def test_fully_isotropic_x_y_pair_seeds_are_rotation_degenerate() -> None:
+    p = BipolaronParameters(
+        nx=4,
+        ny=4,
+        pair_position=6,
+        hubbard_u=0.525,
+        nearest_neighbor_v=0.030,
+        j0x=0.0575,
+        j0y=0.0575,
+        alpha_interx=0.10,
+        alpha_intery=0.10,
+        eigensolver_tolerance=1.0e-12,
+    )
+    displacement = -p.alpha_intra / p.k1
+
+    ux = np.zeros((p.ny, p.nx), dtype=float)
+    uy = np.zeros_like(ux)
+    cy, cx = divmod(p.pair_index, p.nx)
+    ux[cy, cx] = displacement
+    ux[cy, (cx + 1) % p.nx] = displacement
+    uy[cy, cx] = displacement
+    uy[(cy + 1) % p.ny, cx] = displacement
+
+    zero = np.zeros_like(ux)
+    state_x = LatticeState(u=ux, vx=zero.copy(), vy=zero.copy())
+    state_y = LatticeState(u=uy, vx=zero.copy(), vy=zero.copy())
+
+    ground_x = solve_holstein_peierls_ground_state(state_x, p)
+    ground_y = solve_holstein_peierls_ground_state(state_y, p)
+    obs_x = pair_observables(ground_x, p)
+    obs_y = pair_observables(ground_y, p)
+
+    assert np.isclose(ground_x.energy, ground_y.energy, atol=3.0e-12)
+    assert np.isclose(
+        obs_x.nearest_neighbour_x_probability,
+        obs_y.nearest_neighbour_y_probability,
+        atol=3.0e-12,
+    )
+    assert np.isclose(obs_x.onsite_probability, obs_y.onsite_probability, atol=3.0e-12)
