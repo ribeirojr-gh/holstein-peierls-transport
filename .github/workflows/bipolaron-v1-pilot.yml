@@ -8,59 +8,19 @@ on:
   workflow_dispatch:
 
 jobs:
-  strict-size40:
+  strict-size40-final-bracket:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - label: u1000-v0075-x
-            U: 1.000
-            V1: 0.0075
+          - label: u0525-v0305-x
+            U: 0.525
+            V1: 0.0305
             branch: intersite_x
-          - label: u1000-v0075-sep
-            U: 1.000
-            V1: 0.0075
-            branch: separated
-          - label: u1000-v0080-x
-            U: 1.000
-            V1: 0.0080
-            branch: intersite_x
-          - label: u1000-v0080-sep
-            U: 1.000
-            V1: 0.0080
-            branch: separated
-          - label: u0525-v029-x
+          - label: u0525-v0305-on
             U: 0.525
-            V1: 0.029
-            branch: intersite_x
-          - label: u0525-v029-on
-            U: 0.525
-            V1: 0.029
+            V1: 0.0305
             branch: onsite
-          - label: u0525-v030-x
-            U: 0.525
-            V1: 0.030
-            branch: intersite_x
-          - label: u0525-v030-on
-            U: 0.525
-            V1: 0.030
-            branch: onsite
-          - label: u0525-v184-on
-            U: 0.525
-            V1: 0.184
-            branch: onsite
-          - label: u0525-v184-sep
-            U: 0.525
-            V1: 0.184
-            branch: separated
-          - label: u0525-v186-on
-            U: 0.525
-            V1: 0.186
-            branch: onsite
-          - label: u0525-v186-sep
-            U: 0.525
-            V1: 0.186
-            branch: separated
     runs-on: ubuntu-latest
     env:
       OMP_NUM_THREADS: 1
