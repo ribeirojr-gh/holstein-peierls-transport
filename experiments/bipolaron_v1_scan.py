@@ -12,7 +12,10 @@ import numpy as np
 
 from holstein_peierls.lattice import LatticeState
 from holstein_peierls.parameters import StaticPolaronParameters
-from holstein_peierls.two_particle.interaction import interaction_expectation
+from holstein_peierls.two_particle.interaction import (
+    interaction_expectation,
+    minimum_image_offsets,
+)
 from holstein_peierls.two_particle.observables import PairObservables, pair_observables
 from holstein_peierls.two_particle.parameters import BipolaronParameters
 from holstein_peierls.two_particle.peierls import (
@@ -20,48 +23,61 @@ from holstein_peierls.two_particle.peierls import (
     relax_static_holstein_peierls_bipolaron,
 )
 
-BRANCHES = ("onsite", "intersite_x", "intersite_y", "separated")
+BRANCHES = ("onsite", "intersite_x", "intersite_y", "diagonal", "separated")
 
 
 def center_position(size: int) -> int:
     return (size // 2) * size + (size // 2) + 1
 
 
-def intersite_u(parameters: BipolaronParameters, direction: str) -> np.ndarray:
+def two_site_seed(
+    parameters: BipolaronParameters,
+    offset_y: int,
+    offset_x: int,
+) -> LatticeState:
     u = np.zeros((parameters.ny, parameters.nx), dtype=float)
     cy, cx = divmod(parameters.pair_index, parameters.nx)
-    if direction == "x":
-        second = (cy, (cx + 1) % parameters.nx)
-    elif direction == "y":
-        second = ((cy + 1) % parameters.ny, cx)
-    else:
-        raise ValueError(direction)
+    second = ((cy + offset_y) % parameters.ny, (cx + offset_x) % parameters.nx)
     displacement = -parameters.alpha_intra / parameters.k1
     u[cy, cx] = displacement
     u[second] = displacement
-    return u
+    return LatticeState(u=u, vx=np.zeros_like(u), vy=np.zeros_like(u))
 
 
 def seed_state(parameters: BipolaronParameters, branch: str) -> LatticeState:
     if branch in ("onsite", "separated"):
         return initial_lattice_state(parameters, branch)
     if branch == "intersite_x":
-        u = intersite_u(parameters, "x")
-    elif branch == "intersite_y":
-        u = intersite_u(parameters, "y")
-    else:
-        raise ValueError(branch)
-    return LatticeState(u=u, vx=np.zeros_like(u), vy=np.zeros_like(u))
+        return two_site_seed(parameters, 0, 1)
+    if branch == "intersite_y":
+        return two_site_seed(parameters, 1, 0)
+    if branch == "diagonal":
+        return two_site_seed(parameters, 1, 1)
+    raise ValueError(branch)
 
 
-def classify_final_state(observables: PairObservables) -> str:
-    local = observables.onsite_probability + observables.nearest_neighbour_probability
+def diagonal_probability(
+    wavefunction: np.ndarray,
+    parameters: BipolaronParameters,
+) -> float:
+    dx, dy = minimum_image_offsets(parameters)
+    diagonal = (dx == 1) & (dy == 1)
+    return float(np.sum(np.square(wavefunction)[diagonal]))
+
+
+def classify_final_state(observables: PairObservables, p_diagonal: float) -> str:
+    local = (
+        observables.onsite_probability
+        + observables.nearest_neighbour_probability
+        + p_diagonal
+    )
     if local < 0.10 and observables.mean_separation > 2.0:
         return "separated"
     channels = {
         "onsite": observables.onsite_probability,
         "intersite_x": observables.nearest_neighbour_x_probability,
         "intersite_y": observables.nearest_neighbour_y_probability,
+        "diagonal": p_diagonal,
     }
     label = max(channels, key=channels.get)
     return label if channels[label] >= 0.25 else "mixed"
@@ -92,6 +108,8 @@ def main() -> None:
         default=list(BRANCHES),
         help="Branches to relax; separated must be included for binding energies.",
     )
+    parser.add_argument("--j0x", type=float, default=0.100)
+    parser.add_argument("--j0y", type=float, default=0.015)
     parser.add_argument("--alpha-x", type=float, default=0.10)
     parser.add_argument("--alpha-y", type=float, default=0.12)
     parser.add_argument("--max-iterations", type=int, default=1200)
@@ -105,6 +123,8 @@ def main() -> None:
         nx=args.size,
         ny=args.size,
         polaron_position=center_position(args.size),
+        j0x=args.j0x,
+        j0y=args.j0y,
         alpha_interx=args.alpha_x,
         alpha_intery=args.alpha_y,
     )
@@ -136,21 +156,34 @@ def main() -> None:
                     initial_state=seed_state(parameters, branch),
                 )
                 obs = pair_observables(result.ground_state, parameters)
+                pdiag = diagonal_probability(result.ground_state.wavefunction, parameters)
                 ratio_x, ratio_y = distortion_ratios(result, parameters)
-                final_state = classify_final_state(obs)
+                final_state = classify_final_state(obs, pdiag)
                 eint = interaction_expectation(result.ground_state.wavefunction, parameters)
-                candidates[branch] = (result, obs, final_state, ratio_x, ratio_y, eint)
+                candidates[branch] = (
+                    result,
+                    obs,
+                    pdiag,
+                    final_state,
+                    ratio_x,
+                    ratio_y,
+                    eint,
+                )
 
             separated_energy = candidates["separated"][0].energy.total
             best_seed = min(candidates, key=lambda key: candidates[key][0].energy.total)
             best_energy = candidates[best_seed][0].energy.total
 
-            for seed, (result, obs, final_state, ratio_x, ratio_y, eint) in candidates.items():
+            for seed, (result, obs, pdiag, final_state, ratio_x, ratio_y, eint) in candidates.items():
                 rows.append(
                     {
                         "size": args.size,
                         "U_eV": float(hubbard_u),
                         "V1_eV": float(v1),
+                        "Jx_eV": parameters.j0x,
+                        "Jy_eV": parameters.j0y,
+                        "alpha_x_eV_per_A": parameters.alpha_interx,
+                        "alpha_y_eV_per_A": parameters.alpha_intery,
                         "seed": seed,
                         "final_state": final_state,
                         "total_energy_eV": result.energy.total,
@@ -161,6 +194,7 @@ def main() -> None:
                         "P_nn": obs.nearest_neighbour_probability,
                         "P_nn_x": obs.nearest_neighbour_x_probability,
                         "P_nn_y": obs.nearest_neighbour_y_probability,
+                        "P_diagonal": pdiag,
                         "mean_r": obs.mean_separation,
                         "rms_r": obs.rms_separation,
                         "one_body_ipr": obs.one_body_ipr,
@@ -172,12 +206,16 @@ def main() -> None:
                     }
                 )
 
-            result, obs, final_state, ratio_x, ratio_y, eint = candidates[best_seed]
+            result, obs, pdiag, final_state, ratio_x, ratio_y, eint = candidates[best_seed]
             minima.append(
                 {
                     "size": args.size,
                     "U_eV": float(hubbard_u),
                     "V1_eV": float(v1),
+                    "Jx_eV": parameters.j0x,
+                    "Jy_eV": parameters.j0y,
+                    "alpha_x_eV_per_A": parameters.alpha_interx,
+                    "alpha_y_eV_per_A": parameters.alpha_intery,
                     "best_seed": best_seed,
                     "best_final_state": final_state,
                     "best_energy_eV": result.energy.total,
@@ -188,6 +226,7 @@ def main() -> None:
                     "P_nn": obs.nearest_neighbour_probability,
                     "P_nn_x": obs.nearest_neighbour_x_probability,
                     "P_nn_y": obs.nearest_neighbour_y_probability,
+                    "P_diagonal": pdiag,
                     "mean_r": obs.mean_separation,
                     "one_body_ipr": obs.one_body_ipr,
                     "max_delta_tx_over_Jx": ratio_x,
@@ -198,9 +237,12 @@ def main() -> None:
                 }
             )
             print(
+                f"Jx={parameters.j0x:.6f} Jy={parameters.j0y:.6f} "
                 f"U={hubbard_u:.3f} V1={v1:.4f} state={final_state:11s} "
                 f"Ebind={separated_energy - result.energy.total:+.8f} eV "
-                f"P0={obs.onsite_probability:.3f} PNNx={obs.nearest_neighbour_x_probability:.3f}"
+                f"P0={obs.onsite_probability:.3f} "
+                f"PNNx={obs.nearest_neighbour_x_probability:.3f} "
+                f"PNNy={obs.nearest_neighbour_y_probability:.3f} Pdiag={pdiag:.3f}"
             )
 
     args.output.mkdir(parents=True, exist_ok=True)
