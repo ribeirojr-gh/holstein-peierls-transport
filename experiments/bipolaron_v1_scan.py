@@ -20,6 +20,8 @@ from holstein_peierls.two_particle.peierls import (
     relax_static_holstein_peierls_bipolaron,
 )
 
+BRANCHES = ("onsite", "intersite_x", "intersite_y", "separated")
+
 
 def center_position(size: int) -> int:
     return (size // 2) * size + (size // 2) + 1
@@ -83,11 +85,21 @@ def main() -> None:
         type=float,
         default=[0.0, 0.005, 0.010, 0.020, 0.040, 0.060, 0.080],
     )
+    parser.add_argument(
+        "--branches",
+        nargs="+",
+        choices=BRANCHES,
+        default=list(BRANCHES),
+        help="Branches to relax; separated must be included for binding energies.",
+    )
     parser.add_argument("--alpha-x", type=float, default=0.10)
     parser.add_argument("--alpha-y", type=float, default=0.12)
     parser.add_argument("--max-iterations", type=int, default=1200)
     parser.add_argument("--output", type=Path, default=Path("bipolaron-v1"))
     args = parser.parse_args()
+
+    if "separated" not in args.branches:
+        parser.error("--branches must include separated")
 
     single = StaticPolaronParameters(
         nx=args.size,
@@ -108,7 +120,7 @@ def main() -> None:
 
     rows: list[dict[str, object]] = []
     minima: list[dict[str, object]] = []
-    branches = ("onsite", "intersite_x", "intersite_y", "separated")
+    branches = tuple(args.branches)
 
     for hubbard_u in args.u_values:
         for v1 in args.v1_values:
@@ -186,7 +198,7 @@ def main() -> None:
                 }
             )
             print(
-                f"U={hubbard_u:.3f} V1={v1:.3f} state={final_state:11s} "
+                f"U={hubbard_u:.3f} V1={v1:.4f} state={final_state:11s} "
                 f"Ebind={separated_energy - result.energy.total:+.8f} eV "
                 f"P0={obs.onsite_probability:.3f} PNNx={obs.nearest_neighbour_x_probability:.3f}"
             )
