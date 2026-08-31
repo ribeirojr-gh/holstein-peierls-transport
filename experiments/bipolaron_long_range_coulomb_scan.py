@@ -28,6 +28,24 @@ from holstein_peierls.two_particle.peierls import (
 BRANCHES = ("onsite", "intersite_x", "intersite_y", "diagonal", "separated")
 
 
+def parse_shell_override(specification: str) -> tuple[int, int, float]:
+    """Parse ``DX,DY,VALUE_EV`` for an explicit short-range shell replacement."""
+    parts = [part.strip() for part in specification.split(",")]
+    if len(parts) != 3:
+        raise argparse.ArgumentTypeError(
+            "shell override must have the form DX,DY,VALUE_EV"
+        )
+    try:
+        dx = int(parts[0])
+        dy = int(parts[1])
+        value = float(parts[2])
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "shell override must contain integer DX/DY and floating VALUE_EV"
+        ) from exc
+    return dx, dy, value
+
+
 def center_position(size: int) -> int:
     return (size // 2) * size + (size // 2) + 1
 
@@ -107,6 +125,17 @@ def main() -> None:
     parser.add_argument("--ay", type=float, default=7.0)
     parser.add_argument("--v1", type=float, default=0.0)
     parser.add_argument(
+        "--shell-override",
+        action="append",
+        type=parse_shell_override,
+        default=[],
+        metavar="DX,DY,VALUE_EV",
+        help=(
+            "replace the continuum interaction on one minimum-image shell; "
+            "repeat for multiple shells, e.g. --shell-override 1,1,0.05"
+        ),
+    )
+    parser.add_argument(
         "--branches", nargs="+", choices=BRANCHES, default=list(BRANCHES)
     )
     parser.add_argument("--j0x", type=float, default=0.0575)
@@ -116,6 +145,9 @@ def main() -> None:
     parser.add_argument("--max-iterations", type=int, default=1200)
     parser.add_argument("--output", type=Path, default=Path("bipolaron-long-range"))
     args = parser.parse_args()
+
+    shell_overrides = tuple(args.shell_override)
+    shell_overrides_json = json.dumps(shell_overrides, separators=(",", ":"))
 
     single = StaticPolaronParameters(
         nx=args.size,
@@ -140,6 +172,7 @@ def main() -> None:
         lattice_spacing_x_angstrom=args.ax,
         lattice_spacing_y_angstrom=args.ay,
         relative_permittivity=args.epsilon_values[0],
+        short_range_shell_overrides=shell_overrides,
     )
     base = replace(
         base,
@@ -211,6 +244,7 @@ def main() -> None:
                         "ax_A": args.ax,
                         "ay_A": args.ay,
                         "V1_override_eV": args.v1,
+                        "shell_overrides": shell_overrides_json,
                         **scales,
                         "seed": seed,
                         "final_state": final_state,
@@ -243,6 +277,7 @@ def main() -> None:
                     "ax_A": args.ax,
                     "ay_A": args.ay,
                     "V1_override_eV": args.v1,
+                    "shell_overrides": shell_overrides_json,
                     **scales,
                     "one_polaron_energy_eV": polaron.total_energy,
                     "two_polaron_reference_eV": two_polaron_reference,
@@ -268,7 +303,8 @@ def main() -> None:
             )
             print(
                 f"U={hubbard_u:.3f} eps={epsilon_r:7.2f} "
-                f"Vnn={scales['Vx_eV']:.6f} state={final_state:11s} "
+                f"Vx={scales['Vx_eV']:.6f} Vdiag={scales['Vdiag_eV']:.6f} "
+                f"state={final_state:11s} "
                 f"Ebind(2P)={two_polaron_reference - result.energy.total:+.8f} eV "
                 f"Esep-2P={separated_energy - two_polaron_reference:+.8f} eV"
             )
@@ -290,6 +326,7 @@ def main() -> None:
 
     print(f"One-polaron energy: {polaron.total_energy:.12f} eV")
     print(f"Two-polaron reference: {two_polaron_reference:.12f} eV")
+    print(f"Shell overrides: {shell_overrides_json}")
     print(f"Branches: {branch_path}")
     print(f"Minima: {minima_path}")
     print(f"JSON: {json_path}")
