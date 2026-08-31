@@ -70,11 +70,13 @@ class BondFamily:
 
 @dataclass(frozen=True, slots=True)
 class MolecularBond:
-    """One generated undirected edge in a finite periodic supercell."""
+    """One generated undirected edge plus its bond-family orientation."""
 
     family: str
     source: int
     target: int
+    family_source: int
+    family_target: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,6 +207,11 @@ class PeriodicMolecularLattice2D:
     def generated_bonds(self) -> tuple[MolecularBond, ...]:
         """Generate deterministic unique undirected bonds for the finite cell.
 
+        ``source`` and ``target`` store the canonical undirected edge. The
+        separate ``family_source`` and ``family_target`` fields preserve the
+        orientation declared by the bond family, which is required for Peierls
+        differences such as ``q_j - q_i``.
+
         Small periodic cells can map two translated representatives of the same
         family onto the same undirected edge. Such same-family duplicates are
         collapsed. If two *different* families map to the same edge, the model
@@ -231,7 +238,13 @@ class PeriodicMolecularLattice2D:
                     if previous is None:
                         edge_family[edge] = family.label
                         generated.append(
-                            MolecularBond(family=family.label, source=edge[0], target=edge[1])
+                            MolecularBond(
+                                family=family.label,
+                                source=edge[0],
+                                target=edge[1],
+                                family_source=source,
+                                family_target=target,
+                            )
                         )
                     elif previous != family.label:
                         raise ValueError(

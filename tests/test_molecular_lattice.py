@@ -76,6 +76,12 @@ def test_rectangular_positions_and_bond_graph_match_legacy_topology() -> None:
     assert (0, 2, "x") in edges
     assert (0, 3, "y") in edges
     assert (0, 6, "y") in edges
+    x_wrap = next(
+        bond
+        for bond in bonds
+        if bond.family == "x" and bond.source == 0 and bond.target == 2
+    )
+    assert (x_wrap.family_source, x_wrap.family_target) == (2, 0)
 
 
 def test_small_periodic_cell_collapses_same_family_duplicate_edges() -> None:
