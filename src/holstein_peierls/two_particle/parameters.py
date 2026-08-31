@@ -14,8 +14,17 @@ class BipolaronParameters:
 
     Energies are in eV and displacements in angstrom, matching the validated
     single-polaron implementation. ``gradient_convergence_criterion`` is in
-    eV/angstrom. The interaction sector contains onsite ``hubbard_u`` and an
-    optional positive nearest-neighbour repulsion ``nearest_neighbor_v``.
+    eV/angstrom.
+
+    The interaction sector contains onsite ``hubbard_u`` and an optional
+    positive nearest-neighbour repulsion ``nearest_neighbor_v``. The screened
+    long-range Coulomb tail is explicitly opt-in through
+    ``long_range_coulomb``. When enabled, both physical lattice spacings and
+    ``relative_permittivity`` must be supplied. The continuum tail is applied
+    only for distinct sites; onsite ``hubbard_u`` remains an independent
+    short-range parameter. A nonzero ``nearest_neighbor_v`` replaces, rather
+    than adds to, the continuum value on the four cardinal nearest neighbours.
+
     The Holstein-only reference solver ignores ``k2`` and the intermolecular
     coupling constants; the Peierls extension activates them.
     """
@@ -31,6 +40,10 @@ class BipolaronParameters:
     alpha_intery: float = 0.4
     hubbard_u: float = 0.0
     nearest_neighbor_v: float = 0.0
+    long_range_coulomb: bool = False
+    lattice_spacing_x_angstrom: float | None = None
+    lattice_spacing_y_angstrom: float | None = None
+    relative_permittivity: float | None = None
     pair_position: int = 205
     max_iterations: int = 2000
     update_start: float = 1.0e-3
@@ -42,6 +55,30 @@ class BipolaronParameters:
     gradient_convergence_criterion: float = 1.0e-6
     eigensolver_tolerance: float = 1.0e-11
     eigensolver_max_iterations: int = 20_000
+
+    def __post_init__(self) -> None:
+        if self.nearest_neighbor_v < 0.0:
+            raise ValueError("nearest_neighbor_v must be non-negative")
+        if not self.long_range_coulomb:
+            return
+
+        required = {
+            "lattice_spacing_x_angstrom": self.lattice_spacing_x_angstrom,
+            "lattice_spacing_y_angstrom": self.lattice_spacing_y_angstrom,
+            "relative_permittivity": self.relative_permittivity,
+        }
+        missing = [name for name, value in required.items() if value is None]
+        if missing:
+            names = ", ".join(missing)
+            raise ValueError(
+                "long_range_coulomb requires explicit positive values for " + names
+            )
+        nonpositive = [
+            name for name, value in required.items() if value is not None and value <= 0.0
+        ]
+        if nonpositive:
+            names = ", ".join(nonpositive)
+            raise ValueError("long-range Coulomb parameters must be positive: " + names)
 
     @property
     def n_sites(self) -> int:
@@ -72,6 +109,10 @@ class BipolaronParameters:
         *,
         hubbard_u: float = 0.0,
         nearest_neighbor_v: float = 0.0,
+        long_range_coulomb: bool = False,
+        lattice_spacing_x_angstrom: float | None = None,
+        lattice_spacing_y_angstrom: float | None = None,
+        relative_permittivity: float | None = None,
     ) -> "BipolaronParameters":
         """Create a two-particle parameter set from a validated polaron input."""
         return cls(
@@ -86,6 +127,10 @@ class BipolaronParameters:
             alpha_intery=parameters.alpha_intery,
             hubbard_u=hubbard_u,
             nearest_neighbor_v=nearest_neighbor_v,
+            long_range_coulomb=long_range_coulomb,
+            lattice_spacing_x_angstrom=lattice_spacing_x_angstrom,
+            lattice_spacing_y_angstrom=lattice_spacing_y_angstrom,
+            relative_permittivity=relative_permittivity,
             pair_position=parameters.polaron_position,
             max_iterations=parameters.max_iterations,
             update_start=parameters.update_start,
