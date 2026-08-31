@@ -95,6 +95,17 @@ The shell-range hierarchy itself is stable with size:
 
 At 20x20, the total R1 -> R3 change is approximately `0.0391` in `epsilon_c` for `U = 0.525 eV` and `7.72` for `U = 1.000 eV`.
 
+## Normalized screening interpretation
+
+Because every replaced shell is scaled by the same factor `eta`, a useful diagnostic is the ratio of the combined-model boundary to the pure-continuum boundary at the same cell size.
+
+For R3,
+
+- at 10x10, `epsilon_c(R3) / epsilon_c(R0) = 0.75034` for `U = 0.525 eV` and `0.75175` for `U = 1.000 eV`;
+- at 20x20, using the independently validated pure-continuum values `6.95468` and `524.02`, the ratios are `0.74200` and `0.74552`, respectively.
+
+These values are close to the imposed `eta = 0.75`. This is physically natural: once the explicitly screened region covers the shells carrying most of the localized pair probability, the dissociation threshold is controlled primarily by the effective short-range scale `eta / epsilon_r`; the unscreened remainder of the continuum tail supplies the residual departure from exact proportionality. The 40x40 calculation tests whether this interpretation persists at larger size.
+
 ## 40x40 promotion strategy
 
 The final large-cell refinement uses only the branches required by the 20x20 energy landscape:
