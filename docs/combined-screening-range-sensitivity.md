@@ -83,35 +83,67 @@ The minimum is the onsite branch throughout these brackets. Competing localized 
 
 The minimum is the axial intersite branch. The diagonal branch remains metastable and approximately `1.9-2.7 meV` above the axial branch over these brackets, so no diagonal rescue phase appears at 20x20.
 
-## Finite-size trend from 10x10 to 20x20
+## Strict 40x40 refinement
 
-For `U = 0.525 eV`, the critical values move upward by only about `0.7%` from 10x10 to 20x20 for R1-R3. For `U = 1.000 eV`, they move downward by about `9%`, consistent with the stronger finite-size sensitivity already observed for the weakly bound axial state in the pure-continuum study.
+The final large-cell refinement used the same strict structural and eigensolver criteria. For `U = 0.525 eV`, the onsite branch alone was followed because the 20x20 landscape places competing localized branches far above it. For `U = 1.000 eV`, both the axial and diagonal localized branches were recalculated to recheck the phase topology.
 
-The shell-range hierarchy itself is stable with size:
+All 18 large-cell relaxations converged. Maximum final structural updates were below `1e-8 angstrom`; maximum structural gradients were of order `1e-8 eV/angstrom`.
 
-- first-shell replacement accounts for the overwhelming majority of the shift from the pure continuum result;
-- the R1 -> R2 correction is clearly smaller;
-- the R2 -> R3 correction is smaller again.
+### U = 0.525 eV
 
-At 20x20, the total R1 -> R3 change is approximately `0.0391` in `epsilon_c` for `U = 0.525 eV` and `7.72` for `U = 1.000 eV`.
+| model | lower epsilon | E_bind lower (meV) | upper epsilon | E_bind upper (meV) | epsilon_c |
+|---|---:|---:|---:|---:|---:|
+| R1 | 5.10 | -0.278563 | 5.25 | +0.109325 | 5.207723 |
+| R2 | 5.10 | -0.199895 | 5.25 | +0.188867 | 5.177128 |
+| R3 | 5.10 | -0.180034 | 5.25 | +0.208876 | 5.169438 |
+
+The minimum remains onsite throughout. At the bracket endpoints its onsite probability is approximately `0.954-0.955`, confirming that the critical state remains a strongly local pair.
+
+### U = 1.000 eV
+
+| model | lower epsilon | E_bind lower (meV) | upper epsilon | E_bind upper (meV) | epsilon_c |
+|---|---:|---:|---:|---:|---:|
+| R1 | 350 | -0.315174 | 390 | +0.121918 | 378.843 |
+| R2 | 350 | -0.254007 | 390 | +0.176792 | 373.585 |
+| R3 | 350 | -0.233809 | 390 | +0.194904 | 371.815 |
+
+The axial intersite branch remains the minimum throughout the 40x40 brackets. Its nearest-neighbour-x probability is approximately `0.881`. The explicitly followed diagonal branch remains unbound and about `2.0-2.9 meV` above the axial state over the bracket, so there is no diagonal rescue phase at the large-cell dissociation boundary.
+
+## Size and shell-range convergence
+
+The interpolated boundaries across cell sizes are:
+
+| U (eV) | size | R1 | R2 | R3 |
+|---:|---:|---:|---:|---:|
+| 0.525 | 10 | 5.16244 | 5.13164 | 5.12407 |
+| 0.525 | 20 | 5.19949 | 5.16816 | 5.16035 |
+| 0.525 | 40 | 5.20772 | 5.17713 | 5.16944 |
+| 1.000 | 10 | 437.780 | 431.952 | 430.041 |
+| 1.000 | 20 | 398.386 | 392.596 | 390.665 |
+| 1.000 | 40 | 378.843 | 373.585 | 371.815 |
+
+For `U = 0.525 eV`, finite-size drift is already small by 20x20. For `U = 1.000 eV`, the weakly bound axial state retains the stronger finite-size sensitivity expected from the pure-continuum study, but the ordering of R1, R2, and R3 is unchanged at every size.
+
+The shell-range hierarchy is strongly convergent at 40x40:
+
+- `R1 -> R2` changes `epsilon_c` by `0.03060` for `U = 0.525 eV` and `5.258` for `U = 1.000 eV`;
+- `R2 -> R3` changes it by only `0.00769` and `1.770`, respectively.
+
+Thus the cardinal nearest-neighbour shell accounts for the overwhelming majority of the short-range-screening correction. The diagonal shell gives a smaller secondary contribution, and the second axial shell gives a smaller correction again. A fourth shell is not justified for the present generic control because the range sequence already shows a clear hierarchy and no competing phase is emerging.
 
 ## Normalized screening interpretation
 
-Because every replaced shell is scaled by the same factor `eta`, a useful diagnostic is the ratio of the combined-model boundary to the pure-continuum boundary at the same cell size.
+A useful diagnostic is the ratio of the combined-model boundary to the corresponding pure-continuum boundary. Using the previously validated 40x40 pure-tail values `epsilon_c = 6.89070` for `U = 0.525 eV` and `493.908` for `U = 1.000 eV`,
 
-For R3,
+- `epsilon_c(R3) / epsilon_c(R0) = 0.75021` for `U = 0.525 eV`;
+- `epsilon_c(R3) / epsilon_c(R0) = 0.75280` for `U = 1.000 eV`.
 
-- at 10x10, `epsilon_c(R3) / epsilon_c(R0) = 0.75034` for `U = 0.525 eV` and `0.75175` for `U = 1.000 eV`;
-- at 20x20, using the independently validated pure-continuum values `6.95468` and `524.02`, the ratios are `0.74200` and `0.74552`, respectively.
+Both are extremely close to the imposed `eta = 0.75`. Once the explicitly screened region covers the shells carrying most of the localized-pair probability, the dissociation threshold is therefore controlled primarily by the effective short-range scale `eta / epsilon_r`; the remaining continuum tail supplies only a residual correction.
 
-These values are close to the imposed `eta = 0.75`. This is physically natural: once the explicitly screened region covers the shells carrying most of the localized pair probability, the dissociation threshold is controlled primarily by the effective short-range scale `eta / epsilon_r`; the unscreened remainder of the continuum tail supplies the residual departure from exact proportionality. The 40x40 calculation tests whether this interpretation persists at larger size.
+## Conclusion and next model stage
 
-## 40x40 promotion strategy
+The shell-resolved combined interaction is numerically stable, preserves the validated pure-tail limits, and provides a controlled bridge between a continuum dielectric description and effective short-range screened matrix elements. The generic isotropic control establishes that three short-range shell classes are sufficient for the present sensitivity analysis; extending to `R4` would add computational cost without a demonstrated physical need.
 
-The final large-cell refinement uses only the branches required by the 20x20 energy landscape:
+The next stage should therefore be material-specific rather than a longer generic shell expansion. Short-range interaction matrix elements, dielectric response, crystal geometry, transfer integrals, and electron-phonon couplings should be obtained from traceable literature or electronic-structure calculations for a specific molecular semiconductor before constructing material-specific bipolaron phase diagrams.
 
-- for `U = 0.525 eV`, the onsite branch is followed against the authoritative `2 E_polaron` reference;
-- for `U = 1.000 eV`, both axial and diagonal localized branches are recalculated so that the phase topology is rechecked at large size;
-- the finite-cell separated branch is not used to define dissociation and therefore is not required for the critical boundary.
-
-The strict 40x40 refinement is performed for R1-R3 with narrow bracketing intervals. Its results will be appended below after completion.
+Direct Coulomb-Peierls force terms remain outside this frozen-distance validation and should be introduced separately if material-specific interpretation shows that geometry-dependent Coulomb forces are quantitatively required.
