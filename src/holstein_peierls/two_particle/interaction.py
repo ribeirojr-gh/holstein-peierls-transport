@@ -71,7 +71,24 @@ def minimum_image_distances_angstrom(parameters: BipolaronParameters) -> FloatAr
     )
 
 
-@lru_cache(maxsize=4)
+def _apply_explicit_shell_overrides(
+    interaction: FloatArray,
+    parameters: BipolaronParameters,
+    dx: IntArray,
+    dy: IntArray,
+) -> None:
+    """Replace selected continuum shells by explicit screened interactions.
+
+    ``BipolaronParameters`` validates that these overrides are used only with
+    the long-range model, do not target the onsite shell, and do not conflict
+    with the legacy scalar ``nearest_neighbor_v`` representation.
+    """
+    for shell_dx, shell_dy, value_ev in parameters.short_range_shell_overrides:
+        shell = (dx == shell_dx) & (dy == shell_dy)
+        interaction[shell] = value_ev
+
+
+@lru_cache(maxsize=8)
 def pair_interaction_matrix(parameters: BipolaronParameters) -> FloatArray:
     """Return the cached static two-carrier interaction matrix ``V_ij``.
 
@@ -88,6 +105,9 @@ def pair_interaction_matrix(parameters: BipolaronParameters) -> FloatArray:
       it replaces the continuum value on the four cardinal nearest neighbours.
       It is never added to the continuum tail, avoiding implicit double
       counting of short-range screening.
+    - ``short_range_shell_overrides`` can then replace additional explicitly
+      selected minimum-image shells, for example a diagonal shell ``(1, 1)``.
+      The continuum interaction remains untouched outside those shells.
 
     The returned array is read-only so it can safely be reused across repeated
     eigensolver calls during lattice relaxation.
@@ -100,6 +120,9 @@ def pair_interaction_matrix(parameters: BipolaronParameters) -> FloatArray:
     interaction = np.zeros(
         (parameters.n_sites, parameters.n_sites), dtype=np.float64
     )
+
+    dx: IntArray | None = None
+    dy: IntArray | None = None
 
     if parameters.long_range_coulomb:
         assert parameters.relative_permittivity is not None
@@ -118,6 +141,11 @@ def pair_interaction_matrix(parameters: BipolaronParameters) -> FloatArray:
             interaction[nearest] = parameters.nearest_neighbor_v
         else:
             interaction[nearest] += parameters.nearest_neighbor_v
+
+    if parameters.short_range_shell_overrides:
+        if dx is None or dy is None:
+            dx, dy = minimum_image_offsets(parameters)
+        _apply_explicit_shell_overrides(interaction, parameters, dx, dy)
 
     if parameters.hubbard_u != 0.0:
         np.fill_diagonal(interaction, parameters.hubbard_u)
