@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from holstein_peierls.lattice import LatticeState
 from holstein_peierls.two_particle.parameters import BipolaronParameters
@@ -9,7 +10,16 @@ from holstein_peierls.two_particle.peierls import (
 )
 
 
-def test_structural_gradient_remains_correct_with_frozen_long_range_coulomb() -> None:
+@pytest.mark.parametrize(
+    "shell_overrides",
+    [
+        (),
+        ((1, 1, 0.09),),
+    ],
+)
+def test_structural_gradient_remains_correct_with_frozen_long_range_coulomb(
+    shell_overrides: tuple[tuple[int, int, float], ...],
+) -> None:
     p = BipolaronParameters(
         nx=3,
         ny=3,
@@ -19,6 +29,7 @@ def test_structural_gradient_remains_correct_with_frozen_long_range_coulomb() ->
         lattice_spacing_x_angstrom=6.5,
         lattice_spacing_y_angstrom=7.5,
         relative_permittivity=4.0,
+        short_range_shell_overrides=shell_overrides,
         k2=0.73,
         j0x=0.10,
         j0y=0.04,
