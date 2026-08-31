@@ -5,6 +5,10 @@ are identical to the experimental two-particle solver. The only numerical
 specialization is the first ``eigsh`` starting vector, chosen to match the
 onsite, intersite-x, intersite-y, diagonal, or separated branch under
 validation. Subsequent solves reuse the preceding converged eigenvector.
+
+The optional long-range mode uses the same frozen-equilibrium minimum-image
+Coulomb interaction as the research solver and records binding relative to two
+independently relaxed polarons.
 """
 
 from __future__ import annotations
@@ -18,10 +22,12 @@ import numpy as np
 
 from holstein_peierls.lattice import LatticeState
 from holstein_peierls.parameters import StaticPolaronParameters
+from holstein_peierls.polaron import solve_static_polaron
 from holstein_peierls.two_particle.bipolaron import BipolaronRelaxationDiagnostics
 from holstein_peierls.two_particle.interaction import (
     interaction_expectation,
     minimum_image_offsets,
+    pair_interaction_matrix,
 )
 from holstein_peierls.two_particle.observables import pair_observables
 from holstein_peierls.two_particle.parameters import BipolaronParameters
@@ -209,9 +215,22 @@ def main() -> None:
     parser.add_argument("--j0y", type=float, default=0.015)
     parser.add_argument("--alpha-x", type=float, default=0.10)
     parser.add_argument("--alpha-y", type=float, default=0.12)
+    parser.add_argument("--long-range", action="store_true")
+    parser.add_argument("--ax", type=float)
+    parser.add_argument("--ay", type=float)
+    parser.add_argument("--epsilon-r", type=float)
     parser.add_argument("--max-iterations", type=int, default=1200)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+
+    if args.long_range:
+        missing = [
+            name
+            for name, value in (("--ax", args.ax), ("--ay", args.ay), ("--epsilon-r", args.epsilon_r))
+            if value is None
+        ]
+        if missing:
+            parser.error("--long-range requires " + ", ".join(missing))
 
     single = StaticPolaronParameters(
         nx=args.size,
@@ -222,10 +241,22 @@ def main() -> None:
         alpha_interx=args.alpha_x,
         alpha_intery=args.alpha_y,
     )
+    polaron = solve_static_polaron(
+        single,
+        solver="sparse",
+        gradient_mode="optimized",
+        legacy_convergence=False,
+    )
+    two_polaron_reference = 2.0 * polaron.total_energy
+
     parameters = BipolaronParameters.from_polaron_parameters(
         single,
         hubbard_u=args.u,
         nearest_neighbor_v=args.v1,
+        long_range_coulomb=args.long_range,
+        lattice_spacing_x_angstrom=args.ax if args.long_range else None,
+        lattice_spacing_y_angstrom=args.ay if args.long_range else None,
+        relative_permittivity=args.epsilon_r if args.long_range else None,
     )
     parameters = replace(
         parameters,
@@ -241,6 +272,13 @@ def main() -> None:
     pdiag = diagonal_probability(result.ground_state.wavefunction, parameters)
     ratio_x, ratio_y = distortion_ratios(result, parameters)
     eint = interaction_expectation(result.ground_state.wavefunction, parameters)
+    interaction = pair_interaction_matrix(parameters)
+    first = parameters.pair_index
+    cy, cx = divmod(first, parameters.nx)
+    right = cy * parameters.nx + (cx + 1) % parameters.nx
+    down = ((cy + 1) % parameters.ny) * parameters.nx + cx
+    diag = ((cy + 1) % parameters.ny) * parameters.nx + (cx + 1) % parameters.nx
+
     record = {
         "size": args.size,
         "Jx_eV": args.j0x,
@@ -249,8 +287,18 @@ def main() -> None:
         "alpha_y_eV_per_A": args.alpha_y,
         "U_eV": args.u,
         "V1_eV": args.v1,
+        "long_range_coulomb": args.long_range,
+        "ax_A": args.ax if args.long_range else None,
+        "ay_A": args.ay if args.long_range else None,
+        "epsilon_r": args.epsilon_r if args.long_range else None,
+        "Vx_eV": float(interaction[first, right]),
+        "Vy_eV": float(interaction[first, down]),
+        "Vdiag_eV": float(interaction[first, diag]),
         "branch": args.branch,
+        "one_polaron_energy_eV": polaron.total_energy,
+        "two_polaron_reference_eV": two_polaron_reference,
         "total_energy_eV": result.energy.total,
+        "binding_vs_2polaron_eV": two_polaron_reference - result.energy.total,
         "interaction_energy_eV": eint,
         "P_onsite": obs.onsite_probability,
         "P_nn": obs.nearest_neighbour_probability,
