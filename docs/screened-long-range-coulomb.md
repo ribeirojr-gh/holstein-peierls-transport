@@ -88,6 +88,84 @@ and
 
 These quantities should be reported alongside `a_x`, `a_y`, and `epsilon_r`. In particular, comparison with the validated `U + V1` phase boundaries should be made through these actual energy scales rather than by treating `epsilon_r` alone as a universal coupling parameter.
 
+## Validated control geometry
+
+The numerical validation below uses an intentionally generic isotropic control,
+
+`Jx = Jy = 0.0575 eV`,
+
+`alpha_x = alpha_y = 0.10 eV/A`,
+
+`a_x = a_y = 7.0 A`,
+
+with `V1 = 0`. The choice `a = 7 A` is a convenient molecular-lattice length scale, not a pentacene fit. The results in this section therefore validate the numerical and qualitative response of the long-range model rather than a material-specific dielectric constant.
+
+All promoted large-cell branch calculations use the strict convergence criteria
+
+`max structural update < 1e-8 A`,
+
+`max structural gradient < 1e-6 eV/A`,
+
+and `eigsh` tolerance `1e-11`.
+
+## Validation of the dissociation reference
+
+The finite-cell separated branch was calculated for `L = 10, 20, 40` at `epsilon_r = 10` and `100`. The residual excess above the infinite-separation reference is:
+
+| L | epsilon_r=10 | epsilon_r=100 |
+|---:|---:|---:|
+| 10 | 29.473 meV | 2.948 meV |
+| 20 | 14.640 meV | 1.464 meV |
+| 40 | 7.29634 meV | 0.729635 meV |
+
+The data simultaneously show
+
+`E_separated(L) - 2 E_polaron ~ 1 / (epsilon_r L)`.
+
+For a square cell with the two localized carriers at maximum diagonal separation, `r_max ~= a L / sqrt(2)`, so the point-charge prediction is
+
+`epsilon_r L [E_separated - 2 E_polaron] -> 14.3996454784255 sqrt(2) / a`.
+
+For `a = 7 A`, the analytic coefficient is `2.90917 eV`. The 40x40 numerical value is about `2.919 eV`, agreeing at the approximately 0.3% level. This validates both the finite-size scaling and the absolute minimum-image Coulomb scale. Consequently, `2 E_polaron`, not the finite-cell separated branch, is the authoritative dissociation reference.
+
+The corresponding GitHub Actions size-scaling run is `33338074979`.
+
+## Binding boundaries for the pure 1/r tail
+
+Small-cell exploratory scans identify two relevant bound branches for the control geometry: an onsite bipolaron at `U = 0.525 eV` and an axial intersite bipolaron at `U = 1.0 eV`.
+
+The promoted critical screening values obtained from the scans and strict calculations are:
+
+| U (eV) | bound branch | 10x10 | 20x20 strict | 40x40 strict broad bracket |
+|---:|---|---:|---:|---:|
+| 0.525 | onsite | ~6.824 | 6.95468 | 6.8 < epsilon_c < 7.2 |
+| 1.000 | intersite axial | ~571.2 | 524.02 | 480 < epsilon_c < 540 |
+
+In 40x40, the explicit binding energies relative to `2 E_polaron` are:
+
+- `U = 0.525`, onsite: `-0.177913 meV` at `epsilon_r = 6.8` and `+0.586828 meV` at `epsilon_r = 7.2`.
+- `U = 1.0`, intersite-x: `-0.113942 meV` at `epsilon_r = 480` and `+0.337179 meV` at `epsilon_r = 540`.
+
+Simple interpolation of the broad brackets gives approximately `epsilon_c = 6.89` and `epsilon_c = 495`, respectively. A dedicated narrow 40x40 refinement is being used to remove interpolation-convention uncertainty before these values are treated as final reference numbers.
+
+At the broad-bracket crossings the Peierls distortion remains within the conservative linear regime. The onsite branch has `max |Delta t|/J ~ 0.095-0.097`; the axial branch has approximately `0.184` along its primary direction and `0.081` in the transverse direction.
+
+The strict 20x20 run is `33361841218`; the broad strict 40x40 run is `33362002931`.
+
+## Absence of the diagonal intermediate phase for the pure tail
+
+The `U + V1` model in `v0.4.0a1` supports an intermediate diagonal bipolaron in the fully isotropic system because a cardinal `V1` penalizes axial nearest-neighbour configurations while leaving the diagonal separation unpenalized.
+
+The pure `1/r` tail changes this topology. It penalizes the diagonal configuration as well. A strict 40x40 diagonal branch at `U = 1.0`, `epsilon_r = 540` remains unbound by `1.78865 meV` relative to `2 E_polaron`, while the axial branch at the same screening is bound by `0.337179 meV`. Its diagonal probability is about `0.880`, confirming that the calculation genuinely follows the diagonal local minimum rather than relaxing into the axial state.
+
+Thus, within the validated control model, there is no diagonal rescue phase near the axial dissociation boundary for the pure continuum tail.
+
+## Physical interpretation and limitation
+
+The control calculations expose two very different robustness scales. Near the 40x40 broad crossings, the equivalent nearest-neighbour continuum repulsion is of order `0.30 eV` for the onsite `U = 0.525 eV` state but only about `4 meV` for the axial `U = 1.0 eV` state. The onsite pair is protected because its dominant probability remains on the same site, where the independent Hubbard `U` rather than the offsite continuum tail applies. The intersite pair is directly exposed to intermolecular repulsion and is correspondingly fragile.
+
+These values must not be read as material Coulomb parameters. A molecular-contact point-charge expression is precisely where continuum screening is least controlled. The more physical next model is therefore an effective short-range `V1` combined with the continuum tail at longer separation, with `V1` replacing rather than adding to the continuum nearest-neighbour value. Sensitivity to the short-range replacement range should be assessed before making a pentacene-specific claim.
+
 ## Literature context
 
 Electronic polarization is a major contribution to charge energetics in molecular crystals. Tsiper and Soos reported strong solid-state polarization in pentacene and an optical dielectric tensor for the neutral crystal (Phys. Rev. B 68, 085301, 2003; DOI 10.1103/PhysRevB.68.085301). Ha, Qi, and Kahn extracted an approximate relative permittivity near 2.8 from STM line profiles in doped pentacene films (Chem. Phys. Lett. 495, 212-217, 2010; DOI 10.1016/j.cplett.2010.06.085).
@@ -105,3 +183,5 @@ Before any release or material claim, the long-range branch must pass the follow
 5. small-cell scans in dielectric strength with multiple pair branches;
 6. promotion of only physically controlled boundaries to 20x20 and 40x40 strict validation;
 7. separate assessment of whether direct Coulomb-lattice forces are needed before a material-specific interpretation.
+
+Items 1-6 are satisfied for the pure-tail control geometry described above. Item 7 remains intentionally open and is not required for interpreting the present frozen-distance model as a numerical control.
