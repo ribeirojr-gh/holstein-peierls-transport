@@ -145,7 +145,7 @@ screened Coulomb parameters in molecular crystals are effective low-energy
 matrix elements and that longer-range terms can remain important:
 
 - L. Cano-Cortes, A. Dolfen, J. Merino, and E. Koch, *Physica B* **405**, S185-S187 (2010), DOI: `10.1016/j.physb.2009.12.079`.
-- L. Cano-Cortes et al., *Eur. Phys. J. B* **56**, 173-178 (2007), "Coulomb parameters and photoemission for the molecular metal TTF-TCNQ".
+- L. Cano-Cortes et al., *Eur. Phys. J. B* **56**, 173-176 (2007), "Coulomb parameters and photoemission for the molecular metal TTF-TCNQ".
 - S. D. Ha, Y. Qi, and A. Kahn, *Chemical Physics Letters* **495**, 212-217 (2010), DOI: `10.1016/j.cplett.2010.06.085`.
 
 These references motivate the separation of short- and longer-range screening;
