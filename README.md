@@ -6,21 +6,28 @@ molecular organic semiconductors.
 
 ## Status
 
-Version `0.4.0a1` retains the validated **static one-polaron** implementation
-from `0.2.0a1` and the correlated static singlet-bipolaron solver introduced in
-`0.3.0a1`, and adds a validated **extended-Hubbard nearest-neighbour repulsion**
-`V1` together with explicit stationary hopping-isotropy controls. The
-correlated two-particle path supports adiabatic Holstein-Hubbard and
-Holstein-Peierls-Hubbard calculations, `U + V1` interactions, matrix-free
-electronic operators, full `u`/`vx`/`vy` lattice relaxation, onsite/axial/
-diagonal/separated branch searches, pair observables, and strict
-residual-gradient convergence.
+Version `0.5.0a1` retains the validated **static one-polaron** implementation
+from `0.2.0a1`, the correlated static singlet-bipolaron solver introduced in
+`0.3.0a1`, and the extended-Hubbard nearest-neighbour interaction and
+anisotropy/isotropy validation from `0.4.0a1`. It adds a validated, opt-in
+**screened long-range Coulomb interaction** for distinct sites, with explicit
+physical lattice spacings and dielectric screening, minimum-image periodic
+geometry, a controlled short-range `V1` replacement rule, and an
+infinite-separation dissociation reference based on `2 E_polaron`.
+
+The correlated two-particle path supports adiabatic Holstein-Hubbard and
+Holstein-Peierls-Hubbard calculations, `U + V1` interactions, screened
+long-range offsite repulsion, matrix-free electronic operators, full
+`u`/`vx`/`vy` lattice relaxation, onsite/axial/diagonal/separated branch
+searches, pair observables, and strict residual-gradient convergence.
 
 The existing one-polaron path remains unchanged and is still the stable
 production interface. The two-particle implementation is isolated under
-`holstein_peierls.two_particle` and should be treated as validated research code
-while screened long-range Coulomb interactions, triplet states, and
-material-specific parameterization remain under development.
+`holstein_peierls.two_particle` and should be treated as validated research code.
+The long-range model in `0.5.0a1` is deliberately a general frozen-distance
+screening model rather than a material-specific dielectric parameterization.
+Triplet states, material-specific bipolaron phase diagrams, and direct
+Coulomb-lattice force terms remain future extensions.
 
 Time-dependent `hp2D.f90` dynamics remain intentionally deferred. The current
 research priority is to establish and validate static correlated two-particle
@@ -36,12 +43,25 @@ lattice is relaxed with RPROP while the electronic state is kept in the
 instantaneous ground state.
 
 The bipolaron extension replaces the one-particle electronic state with a
-correlated singlet wavefunction `Psi(i,j)`. The electronic interaction currently
-contains onsite Hubbard repulsion `U` and a positive isotropic nearest-neighbour
-repulsion `V1`. The spin-summed reduced one-particle density matrix has trace two
-and provides the Holstein and Peierls lattice forces. The two-particle
-Hamiltonian is applied matrix-free, avoiding construction of an `N^2 x N^2`
-dense matrix.
+correlated singlet wavefunction `Psi(i,j)`. The electronic interaction contains
+onsite Hubbard repulsion `U`, an optional positive isotropic nearest-neighbour
+repulsion `V1`, and an optional screened offsite continuum tail
+
+`V(r) = e^2 / (4 pi epsilon_0 epsilon_r r)`.
+
+The long-range interaction requires explicit positive `a_x`, `a_y`, and
+`epsilon_r`. Periodic finite cells use minimum-image distances rather than an
+Ewald sum. If a nonzero `V1` is combined with the long-range tail, `V1` replaces
+the continuum value on the four cardinal nearest-neighbour bonds instead of
+being added to it, avoiding implicit short-range double counting. In this first
+validated implementation Coulomb distances are frozen to the equilibrium
+lattice geometry, so the long-range interaction modifies structural forces only
+through the correlated electronic state and does not yet add an explicit
+electrostatic contribution to the Peierls-coordinate gradients.
+
+The spin-summed reduced one-particle density matrix has trace two and provides
+the Holstein and Peierls lattice forces. The two-particle Hamiltonian is applied
+matrix-free, avoiding construction of an `N^2 x N^2` dense matrix.
 
 Key references underlying the archived one-polaron implementation include:
 
@@ -52,7 +72,8 @@ Key references underlying the archived one-polaron implementation include:
 The working two-particle theory and validation record is documented in
 `docs/two-particle-literature-gap.md`, `docs/two-particle-static-theory.md`,
 `docs/bipolaron-validation-plan.md`, `docs/bipolaron-validation-results.md`,
-`docs/bipolaron-v1-validation.md`, and `docs/bipolaron-isotropy-validation.md`.
+`docs/bipolaron-v1-validation.md`, `docs/bipolaron-isotropy-validation.md`, and
+`docs/screened-long-range-coulomb.md`.
 
 ## Reproducibility and backups
 
@@ -66,8 +87,8 @@ Historical one-polaron behaviours that may look unusual are represented in an
 explicit compatibility path and documented before any modernized alternative is
 introduced. The two-particle solver uses a non-backtracking RPROP variant and is
 validated by stationary energies, residual gradients, analytic limits, pair
-observables, symmetry checks, and finite-size behavior rather than by
-reproducing the historical RPROP iteration trajectory.
+observables, symmetry checks, interaction identities, and finite-size behavior
+rather than by reproducing the historical RPROP iteration trajectory.
 
 ## Getting the source
 
@@ -181,12 +202,47 @@ with strict `40x40` boundaries at approximately `3.65887 meV` and
 approximately `308.57480 meV`. These final isotropic boundaries remain inside
 the conservative linear-Peierls window.
 
-These calculations demonstrate that hopping anisotropy changes the stationary
-energy landscape and phase topology and that isotropy must be separated from
-total-bandwidth changes. They do **not** constitute a material-specific
-pentacene phase diagram. See `docs/bipolaron-v1-validation.md` and
-`docs/bipolaron-isotropy-validation.md` for the finite-size trends, controlled
-ranges, and limitations.
+These short-range calculations demonstrate that hopping anisotropy changes the
+stationary energy landscape and phase topology and that isotropy must be
+separated from total-bandwidth changes. They do **not** constitute a
+material-specific pentacene phase diagram.
+
+### Screened long-range Coulomb validation
+
+Version `0.5.0a1` adds a generic isotropic long-range control with
+
+`Jx = Jy = 0.0575 eV`, `alpha_x = alpha_y = 0.10 eV/angstrom`,
+`a_x = a_y = 7.0 angstrom`, and `V1 = 0`.
+
+The correct infinite-separation reference is
+
+`E_diss = 2 E_polaron`,
+
+because a finite periodic `separated` branch retains a positive minimum-image
+Coulomb repulsion. The calculated excess
+`E_separated(L) - 2 E_polaron` scales as `1/(epsilon_r L)`; on the `40x40`
+control cell the numerical coefficient agrees with the analytic point-charge
+coefficient at about the 0.3% level.
+
+Using `E_bind = 2 E_polaron - E_pair`, strict `40x40` pure-tail calculations
+give the screening boundaries
+
+- `U = 0.525 eV`, onsite branch: `epsilon_c = 6.89070`;
+- `U = 1.000 eV`, intersite-x branch: `epsilon_c = 493.908`.
+
+At the corresponding zero crossings, the cardinal continuum interaction scale
+for `a = 7 angstrom` is approximately `0.2985 eV` for `U = 0.525 eV` and
+`4.165 meV` for `U = 1.0 eV`. The diagonal intermediate phase observed in the
+short-range `U + V1` isotropic model does not rescue binding near dissociation
+for the pure `1/r` tail, because the continuum interaction also penalizes
+diagonal separations.
+
+All promoted large-cell results use `max structural update < 1e-8 angstrom`,
+`max structural gradient < 1e-6 eV/angstrom`, and eigensolver tolerance
+`1e-11`. These calculations validate the numerical long-range interaction model;
+they do not assign a pentacene dielectric constant. See
+`docs/screened-long-range-coulomb.md` for the complete finite-size and branch
+record.
 
 ## Validation and benchmarks
 
@@ -207,11 +263,12 @@ universal performance claims.
 For the two-particle solver, regression tests cover the noninteracting limit,
 singlet exchange symmetry, reduced-density-matrix trace/Hermiticity, Hubbard and
 nearest-neighbour interaction energies, the exact `dE/dV1 = P_NN`
-Hellmann-Feynman identity, analytic Holstein threshold, finite-difference
-Holstein/Peierls gradients, zero-Peierls reduction, rotational symmetry,
-stationary residual gradients, periodic pair observables, and finite-size
-localization. Research scans are retained under `experiments/`; strict
-large-cell results are documented under `docs/`.
+Hellmann-Feynman identity, long-range interaction matrix elements and disabling
+limits, analytic Holstein threshold, finite-difference Holstein/Peierls
+gradients, zero-Peierls reduction, rotational symmetry, stationary residual
+gradients, periodic pair observables, and finite-size localization. Research
+scans are retained under `experiments/`; strict large-cell results are
+documented under `docs/`.
 
 ## Development stages
 
@@ -219,7 +276,8 @@ large-cell results are documented under `docs/`.
 2. Optimized sparse CPU one-polaron implementation.
 3. Correlated static singlet bipolaron solver and strict large-cell validation.
 4. Extended-Hubbard nearest-neighbour repulsion and anisotropy/isotropy phase validation.
-5. Screened long-range Coulomb interaction, triplet sector, and material-specific bipolaron phase diagrams.
-6. Correlated electron-hole exciton solver with separate HOMO/LUMO parameters.
-7. Time-dependent dynamics, transport observables, disorder, and finite temperature.
-8. Optional GPU acceleration where two-particle or dynamical workloads justify it.
+5. Screened long-range Coulomb interaction and finite-size dissociation validation.
+6. Combined short-range effective screening plus continuum tail, triplet sector, and material-specific bipolaron phase diagrams.
+7. Correlated electron-hole exciton solver with separate HOMO/LUMO parameters.
+8. Time-dependent dynamics, transport observables, disorder, and finite temperature.
+9. Optional GPU acceleration where two-particle or dynamical workloads justify it.
