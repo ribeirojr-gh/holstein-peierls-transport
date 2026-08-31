@@ -1,0 +1,52 @@
+name: bipolaron-long-range-strict40-refine
+
+on:
+  push:
+    branches: [screened-long-range-coulomb]
+    paths:
+      - .github/workflows/bipolaron-long-range-strict40-refine.yml
+  workflow_dispatch:
+
+jobs:
+  strict40-refine:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {label: u0525-eps6p86-onsite, U: 0.525, eps: 6.86, branch: onsite}
+          - {label: u0525-eps6p92-onsite, U: 0.525, eps: 6.92, branch: onsite}
+          - {label: u1000-eps490-x, U: 1.0, eps: 490.0, branch: intersite_x}
+          - {label: u1000-eps500-x, U: 1.0, eps: 500.0, branch: intersite_x}
+    runs-on: ubuntu-latest
+    env:
+      OMP_NUM_THREADS: 1
+      OPENBLAS_NUM_THREADS: 1
+      MKL_NUM_THREADS: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install package
+        run: python -m pip install -e '.[dev]'
+      - name: Run strict 40x40 long-range branch
+        run: >-
+          python experiments/bipolaron_branch_benchmark_seeded.py
+          --size 40
+          --u ${{ matrix.U }}
+          --branch ${{ matrix.branch }}
+          --j0x 0.0575
+          --j0y 0.0575
+          --alpha-x 0.10
+          --alpha-y 0.10
+          --long-range
+          --ax 7.0
+          --ay 7.0
+          --epsilon-r ${{ matrix.eps }}
+          --max-iterations 1200
+          --output strict40-refine-${{ matrix.label }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bipolaron-long-range-strict40-refine-${{ matrix.label }}
+          path: strict40-refine-${{ matrix.label }}
+          if-no-files-found: error
