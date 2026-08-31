@@ -240,6 +240,27 @@ class PeriodicMolecularLattice2D:
                         )
         return tuple(generated)
 
+    @staticmethod
+    def _minimum_image_from_raw_displacement(
+        displacement: FloatArray,
+        supercell: FloatArray,
+    ) -> FloatArray:
+        """Minimize one raw displacement over nearby supercell translations."""
+        fractional = np.linalg.solve(supercell, displacement)
+        nearest = np.rint(fractional).astype(np.int64)
+
+        best: FloatArray | None = None
+        best_norm2 = np.inf
+        for offset_x, offset_y in product((-1, 0, 1), repeat=2):
+            image = nearest + np.array((offset_x, offset_y), dtype=np.int64)
+            candidate = displacement - supercell @ image
+            norm2 = float(np.dot(candidate, candidate))
+            if norm2 < best_norm2:
+                best_norm2 = norm2
+                best = candidate
+        assert best is not None
+        return np.asarray(best, dtype=np.float64)
+
     def minimum_image_displacement_angstrom(self, source: int, target: int) -> FloatArray:
         """Return the shortest periodic displacement from ``source`` to ``target``.
 
@@ -256,21 +277,9 @@ class PeriodicMolecularLattice2D:
 
         positions = self.physical_positions_angstrom()
         displacement = positions[target] - positions[source]
-        supercell = self.supercell_matrix
-        fractional = np.linalg.solve(supercell, displacement)
-        nearest = np.rint(fractional).astype(np.int64)
-
-        best: FloatArray | None = None
-        best_norm2 = np.inf
-        for offset_x, offset_y in product((-1, 0, 1), repeat=2):
-            image = nearest + np.array((offset_x, offset_y), dtype=np.int64)
-            candidate = displacement - supercell @ image
-            norm2 = float(np.dot(candidate, candidate))
-            if norm2 < best_norm2:
-                best_norm2 = norm2
-                best = candidate
-        assert best is not None
-        return np.asarray(best, dtype=np.float64)
+        return self._minimum_image_from_raw_displacement(
+            displacement, self.supercell_matrix
+        )
 
     def minimum_image_distances_angstrom(self) -> FloatArray:
         """Return the symmetric physical minimum-image pair-distance matrix.
@@ -294,10 +303,13 @@ class PeriodicMolecularLattice2D:
             ry = dy.astype(np.float64) * spacing_y
             return np.sqrt(np.square(rx) + np.square(ry))
 
+        positions = self.physical_positions_angstrom()
+        supercell = self.supercell_matrix
         distance = np.zeros((self.n_sites, self.n_sites), dtype=np.float64)
         for source in range(self.n_sites):
             for target in range(source + 1, self.n_sites):
-                displacement = self.minimum_image_displacement_angstrom(source, target)
+                raw = positions[target] - positions[source]
+                displacement = self._minimum_image_from_raw_displacement(raw, supercell)
                 value = float(np.linalg.norm(displacement))
                 distance[source, target] = value
                 distance[target, source] = value
