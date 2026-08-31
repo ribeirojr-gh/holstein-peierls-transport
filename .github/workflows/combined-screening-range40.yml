@@ -1,0 +1,223 @@
+name: combined-screening-range40
+
+on:
+  push:
+    branches: [combined-screening-range-sensitivity]
+    paths:
+      - .github/workflows/combined-screening-range40.yml
+  workflow_dispatch:
+
+jobs:
+  range40:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - model: R1_cardinal
+            u: '0.525'
+            eps_lo: '5.10'
+            eps_hi: '5.25'
+          - model: R2_cardinal_diagonal
+            u: '0.525'
+            eps_lo: '5.10'
+            eps_hi: '5.25'
+          - model: R3_through_second_axial
+            u: '0.525'
+            eps_lo: '5.10'
+            eps_hi: '5.25'
+          - model: R1_cardinal
+            u: '1.0'
+            eps_lo: '350.0'
+            eps_hi: '390.0'
+          - model: R2_cardinal_diagonal
+            u: '1.0'
+            eps_lo: '350.0'
+            eps_hi: '390.0'
+          - model: R3_through_second_axial
+            u: '1.0'
+            eps_lo: '350.0'
+            eps_hi: '390.0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install package
+        run: python -m pip install -e '.[dev]'
+      - name: Run strict 40x40 refinement
+        shell: bash
+        env:
+          MODEL: ${{ matrix.model }}
+          U_VALUE: ${{ matrix.u }}
+          EPS_LO: ${{ matrix.eps_lo }}
+          EPS_HI: ${{ matrix.eps_hi }}
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import math
+          import os
+          from dataclasses import replace
+          from pathlib import Path
+
+          from holstein_peierls.parameters import StaticPolaronParameters
+          from holstein_peierls.polaron import solve_static_polaron
+          from holstein_peierls.two_particle.interaction import interaction_expectation
+          from holstein_peierls.two_particle.observables import pair_observables
+          from holstein_peierls.two_particle.parameters import BipolaronParameters
+          from holstein_peierls.two_particle.peierls import relax_static_holstein_peierls_bipolaron
+          from experiments.bipolaron_long_range_coulomb_scan import (
+              center_position,
+              classify_final_state,
+              diagonal_probability,
+              distortion_ratios,
+              seed_state,
+          )
+
+          prefactor = 14.3996454784255
+          spacing = 7.0
+          eta = 0.75
+          size = 40
+          model = os.environ['MODEL']
+          u = float(os.environ['U_VALUE'])
+          eps_values = [float(os.environ['EPS_LO']), float(os.environ['EPS_HI'])]
+
+          model_shells = {
+              'R1_cardinal': [(1, 0), (0, 1)],
+              'R2_cardinal_diagonal': [(1, 0), (0, 1), (1, 1)],
+              'R3_through_second_axial': [
+                  (1, 0), (0, 1), (1, 1), (2, 0), (0, 2)
+              ],
+          }
+          shells = model_shells[model]
+          bound_branches = ['onsite'] if u < 0.75 else ['intersite_x', 'diagonal']
+
+          root = Path('range40') / f'{model}-U{u:g}'
+          root.mkdir(parents=True, exist_ok=True)
+
+          single = StaticPolaronParameters(
+              nx=size,
+              ny=size,
+              polaron_position=center_position(size),
+              j0x=0.0575,
+              j0y=0.0575,
+              alpha_interx=0.10,
+              alpha_intery=0.10,
+          )
+          polaron = solve_static_polaron(
+              single,
+              solver='sparse',
+              gradient_mode='optimized',
+              legacy_convergence=False,
+          )
+          two_polaron_reference = 2.0 * polaron.total_energy
+
+          def continuum(dx: int, dy: int, epsilon: float) -> float:
+              r = spacing * math.sqrt(dx * dx + dy * dy)
+              return prefactor / epsilon / r
+
+          results = []
+          for epsilon in eps_values:
+              overrides = tuple(
+                  (dx, dy, eta * continuum(dx, dy, epsilon))
+                  for dx, dy in shells
+              )
+              p = BipolaronParameters.from_polaron_parameters(
+                  single,
+                  hubbard_u=u,
+                  long_range_coulomb=True,
+                  lattice_spacing_x_angstrom=spacing,
+                  lattice_spacing_y_angstrom=spacing,
+                  relative_permittivity=epsilon,
+                  short_range_shell_overrides=overrides,
+              )
+              p = replace(
+                  p,
+                  pair_position=center_position(size),
+                  max_iterations=2200,
+                  convergence_criterion=1.0e-8,
+                  gradient_convergence_criterion=1.0e-6,
+                  eigensolver_tolerance=1.0e-11,
+              )
+
+              candidates = []
+              for branch in bound_branches:
+                  relaxed = relax_static_holstein_peierls_bipolaron(
+                      p, initial_state=seed_state(p, branch)
+                  )
+                  obs = pair_observables(relaxed.ground_state, p)
+                  pdiag = diagonal_probability(relaxed.ground_state.wavefunction, p)
+                  ratio_x, ratio_y = distortion_ratios(relaxed, p)
+                  entry = {
+                      'model': model,
+                      'eta': eta,
+                      'size': size,
+                      'U_eV': u,
+                      'epsilon_r': epsilon,
+                      'overrides': overrides,
+                      'seed': branch,
+                      'final_state': classify_final_state(obs, pdiag),
+                      'total_energy_eV': relaxed.energy.total,
+                      'binding_vs_2polaron_eV': two_polaron_reference - relaxed.energy.total,
+                      'interaction_energy_eV': interaction_expectation(relaxed.ground_state.wavefunction, p),
+                      'P_onsite': obs.onsite_probability,
+                      'P_nn_x': obs.nearest_neighbour_x_probability,
+                      'P_nn_y': obs.nearest_neighbour_y_probability,
+                      'P_diagonal': pdiag,
+                      'mean_r': obs.mean_separation,
+                      'max_delta_tx_over_Jx': ratio_x,
+                      'max_delta_ty_over_Jy': ratio_y,
+                      'iterations': relaxed.diagnostics.iterations,
+                      'converged': relaxed.diagnostics.converged,
+                      'final_max_update_A': relaxed.diagnostics.final_max_update,
+                      'final_max_gradient_eV_per_A': relaxed.diagnostics.final_max_gradient,
+                  }
+                  candidates.append(entry)
+
+              best = min(candidates, key=lambda item: item['total_energy_eV'])
+              result = dict(best)
+              result.update({
+                  'one_polaron_energy_eV': polaron.total_energy,
+                  'two_polaron_reference_eV': two_polaron_reference,
+                  'all_branches_converged': all(item['converged'] for item in candidates),
+                  'max_branch_update_A': max(item['final_max_update_A'] for item in candidates),
+                  'max_branch_gradient_eV_per_A': max(item['final_max_gradient_eV_per_A'] for item in candidates),
+                  'candidate_branches': candidates,
+              })
+              results.append(result)
+              print(
+                  f"{model} U={u:.3f} eps={epsilon:.5f} "
+                  f"state={result['final_state']} "
+                  f"Ebind={1000*result['binding_vs_2polaron_eV']:+.6f} meV "
+                  f"update={result['max_branch_update_A']:.3e} A "
+                  f"grad={result['max_branch_gradient_eV_per_A']:.3e} eV/A "
+                  f"conv={result['all_branches_converged']}"
+              )
+
+          lo, hi = results
+          y1 = lo['binding_vs_2polaron_eV']
+          y2 = hi['binding_vs_2polaron_eV']
+          if y1 * y2 <= 0.0 and y1 != y2:
+              eps_c = lo['epsilon_r'] - y1 * (hi['epsilon_r'] - lo['epsilon_r']) / (y2 - y1)
+          else:
+              eps_c = None
+          payload = {
+              'model': model,
+              'eta': eta,
+              'size': size,
+              'U_eV': u,
+              'epsilon_c_linear': eps_c,
+              'points': results,
+          }
+          (root / 'result.json').write_text(json.dumps(payload, indent=2) + '\n')
+          print(f"epsilon_c_linear={eps_c}")
+          PY
+      - name: Upload strict 40x40 output
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-screening-range40-${{ matrix.model }}-U${{ matrix.u }}-${{ github.sha }}
+          path: range40
+          if-no-files-found: error
+          retention-days: 30
