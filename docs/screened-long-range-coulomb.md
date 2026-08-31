@@ -136,21 +136,21 @@ Small-cell exploratory scans identify two relevant bound branches for the contro
 
 The promoted critical screening values obtained from the scans and strict calculations are:
 
-| U (eV) | bound branch | 10x10 | 20x20 strict | 40x40 strict broad bracket |
+| U (eV) | bound branch | 10x10 | 20x20 strict | 40x40 strict |
 |---:|---|---:|---:|---:|
-| 0.525 | onsite | ~6.824 | 6.95468 | 6.8 < epsilon_c < 7.2 |
-| 1.000 | intersite axial | ~571.2 | 524.02 | 480 < epsilon_c < 540 |
+| 0.525 | onsite | ~6.824 | 6.95468 | 6.89070 |
+| 1.000 | intersite axial | ~571.2 | 524.02 | 493.908 |
 
-In 40x40, the explicit binding energies relative to `2 E_polaron` are:
+The final 40x40 narrow brackets, using the binding convention `E_bind = 2 E_polaron - E_pair`, are:
 
-- `U = 0.525`, onsite: `-0.177913 meV` at `epsilon_r = 6.8` and `+0.586828 meV` at `epsilon_r = 7.2`.
-- `U = 1.0`, intersite-x: `-0.113942 meV` at `epsilon_r = 480` and `+0.337179 meV` at `epsilon_r = 540`.
+- `U = 0.525`, onsite: `E_bind = -0.0598028 meV` at `epsilon_r = 6.86` and `+0.0570784 meV` at `epsilon_r = 6.92`, giving `epsilon_c = 6.89070` by linear interpolation.
+- `U = 1.0`, intersite-x: `E_bind = -0.0310847 meV` at `epsilon_r = 490` and `+0.0484589 meV` at `epsilon_r = 500`, giving `epsilon_c = 493.908` by linear interpolation.
 
-Simple interpolation of the broad brackets gives approximately `epsilon_c = 6.89` and `epsilon_c = 495`, respectively. A dedicated narrow 40x40 refinement is being used to remove interpolation-convention uncertainty before these values are treated as final reference numbers.
+All four narrow-bracket calculations satisfy the strict structural criteria. Around the onsite crossing, `max |Delta t|/J` is approximately `0.096` in both directions. Around the axial crossing, the primary x modulation is approximately `0.184` and the transverse y modulation approximately `0.081`, both within the conservative linear-Peierls working range.
 
-At the broad-bracket crossings the Peierls distortion remains within the conservative linear regime. The onsite branch has `max |Delta t|/J ~ 0.095-0.097`; the axial branch has approximately `0.184` along its primary direction and `0.081` in the transverse direction.
+For `a = 7 A`, the final 40x40 critical screenings correspond to a cardinal point-charge scale `Vx` of approximately `0.2985 eV` for the onsite boundary and `4.165 meV` for the axial boundary. These are control-model energy scales, not material parameters.
 
-The strict 20x20 run is `33361841218`; the broad strict 40x40 run is `33362002931`.
+The strict 20x20 run is `33361841218`; the broad strict 40x40 run is `33362002931`; the final narrow 40x40 refinement is `33367133004`.
 
 ## Absence of the diagonal intermediate phase for the pure tail
 
@@ -162,7 +162,7 @@ Thus, within the validated control model, there is no diagonal rescue phase near
 
 ## Physical interpretation and limitation
 
-The control calculations expose two very different robustness scales. Near the 40x40 broad crossings, the equivalent nearest-neighbour continuum repulsion is of order `0.30 eV` for the onsite `U = 0.525 eV` state but only about `4 meV` for the axial `U = 1.0 eV` state. The onsite pair is protected because its dominant probability remains on the same site, where the independent Hubbard `U` rather than the offsite continuum tail applies. The intersite pair is directly exposed to intermolecular repulsion and is correspondingly fragile.
+The control calculations expose two very different robustness scales. Near the final 40x40 crossings, the equivalent nearest-neighbour continuum repulsion is approximately `0.299 eV` for the onsite `U = 0.525 eV` state but only approximately `4.17 meV` for the axial `U = 1.0 eV` state. The onsite pair is protected because its dominant probability remains on the same site, where the independent Hubbard `U` rather than the offsite continuum tail applies. The intersite pair is directly exposed to intermolecular repulsion and is correspondingly fragile.
 
 These values must not be read as material Coulomb parameters. A molecular-contact point-charge expression is precisely where continuum screening is least controlled. The more physical next model is therefore an effective short-range `V1` combined with the continuum tail at longer separation, with `V1` replacing rather than adding to the continuum nearest-neighbour value. Sensitivity to the short-range replacement range should be assessed before making a pentacene-specific claim.
 
