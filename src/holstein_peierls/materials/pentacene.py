@@ -1,17 +1,16 @@
 """Provenance-rich pentacene records for the material-specific G5 stage.
 
-G5a fixed the crystallographic geometry without promoting a transport model.
-G5b adds two deliberately distinct electronic layers:
+G5a fixed the crystallographic geometry. G5b established a signed low-temperature
+band reference and a cross-source 293 K candidate. G5c adds the strongest
+room-temperature single-source signed evidence currently available in the
+project: the experimental ARPES tight-binding fit of Neef et al. together with
+its independent 295 K MD + FO-DFT transfer-integral statistics.
 
-1. a signed 90 K HOMO tight-binding reference fitted by de Wijs et al. to a DFT
-   band structure on the Mattheus low-temperature crystal; and
-2. a 293 K *cross-source candidate* that combines the Stehr et al. room-
-   temperature coupling magnitudes with the gauge-fixed sign pattern established
-   by the signed de Wijs band fit.
-
-The second object is useful for band-topology and scale checks, but it is not
-claimed to be a final single-source pentacene parameterization. Coulomb,
-Holstein, and Peierls material parameters remain unresolved.
+The Neef work remains a preprint as of September 2026. It is therefore promoted
+here as an experimental room-temperature *reference*, but not as the final
+peer-reviewed material parameterization. Its dynamical-disorder standard
+deviations are evidence records only; they are not silently converted into
+Peierls derivatives or elastic constants.
 """
 
 from __future__ import annotations
@@ -65,6 +64,34 @@ class TransferIntegralEvidence:
     source_doi: str
     signed_value_known: bool
     candidate_geometry_group: str
+
+
+@dataclass(frozen=True, slots=True)
+class SignedTransferIntegralReference:
+    """One signed experimental/computational transfer-integral reference."""
+
+    label: str
+    value_mev: float
+    uncertainty_mev: float
+    geometry_group: str
+    source_doi: str
+    evidence_type: str
+    temperature_description: str
+    peer_reviewed: bool
+
+
+@dataclass(frozen=True, slots=True)
+class DynamicalDisorderEvidence:
+    """Thermal hopping statistics that must not be confused with Peierls derivatives."""
+
+    label: str
+    mean_mev: float
+    standard_deviation_mev: float
+    geometry_group: str
+    temperature_k: float
+    method: str
+    source_doi: str
+    peer_reviewed: bool
 
 
 PENTACENE_293K = PentaceneCrystalRecord(
@@ -149,11 +176,9 @@ DEWIJS_2003_HOMO_ONSITE_DIFFERENCE_EV = 0.042
 DEWIJS_2003_SOURCE_DOI = "10.1016/S0379-6779(03)00020-1"
 
 
-# Cross-source 293 K candidate: magnitudes from Stehr et al. and the signed
-# herringbone pattern from de Wijs et al. Each diagonal direction requires two
-# opposite A-B bonds in the finite graph. V3/V4 are assigned deterministically to
-# A/B; exchanging them changes basis character but not the two-band eigenvalues
-# when onsite energies are equal.
+# Cross-source 293 K candidate retained for comparison with the later G5c ARPES
+# reference. Magnitudes come from Stehr et al.; relative signs come from the de
+# Wijs band fit after fixing the molecular-orbital gauge.
 PENTACENE_293K_CROSS_SOURCE_HOLE_HOPPINGS_EV = (
     ("a_AA", 0.03968),
     ("a_BB", 0.03662),
@@ -168,8 +193,86 @@ PENTACENE_293K_CROSS_SOURCE_STATUS = (
 )
 
 
+# Neef et al., arXiv:2412.06030. ARPES was acquired at room temperature and
+# fitted directly with the six-neighbour / three-transfer herringbone model.
+# The work is still listed by the authors' institutions as a preprint as of
+# September 2026, so peer_reviewed=False is intentionally explicit.
+NEEF_2024_SOURCE_DOI = "10.48550/arXiv.2412.06030"
+NEEF_2024_PEER_REVIEWED = False
+NEEF_2024_ARPES_HOLE_HOPPINGS = (
+    SignedTransferIntegralReference(
+        "t_a",
+        35.0,
+        10.0,
+        "a_same_basis",
+        NEEF_2024_SOURCE_DOI,
+        "room-temperature single-crystal ARPES tight-binding fit",
+        "room temperature",
+        NEEF_2024_PEER_REVIEWED,
+    ),
+    SignedTransferIntegralReference(
+        "t_plus",
+        55.0,
+        5.0,
+        "diag_plus_AB",
+        NEEF_2024_SOURCE_DOI,
+        "room-temperature single-crystal ARPES tight-binding fit",
+        "room temperature",
+        NEEF_2024_PEER_REVIEWED,
+    ),
+    SignedTransferIntegralReference(
+        "t_minus",
+        -70.0,
+        5.0,
+        "diag_minus_AB",
+        NEEF_2024_SOURCE_DOI,
+        "room-temperature single-crystal ARPES tight-binding fit",
+        "room temperature",
+        NEEF_2024_PEER_REVIEWED,
+    ),
+)
+
+NEEF_2024_MD_TEMPERATURE_K = 295.0
+NEEF_2024_MD_HOLE_HOPPING_STATISTICS = (
+    DynamicalDisorderEvidence(
+        "t_a",
+        32.0,
+        12.0,
+        "a_same_basis",
+        NEEF_2024_MD_TEMPERATURE_K,
+        "ab-initio-quality MD plus fragment-orbital DFT on extracted dimers",
+        NEEF_2024_SOURCE_DOI,
+        NEEF_2024_PEER_REVIEWED,
+    ),
+    DynamicalDisorderEvidence(
+        "t_plus",
+        39.5,
+        18.0,
+        "diag_plus_AB",
+        NEEF_2024_MD_TEMPERATURE_K,
+        "ab-initio-quality MD plus fragment-orbital DFT on extracted dimers",
+        NEEF_2024_SOURCE_DOI,
+        NEEF_2024_PEER_REVIEWED,
+    ),
+    DynamicalDisorderEvidence(
+        "t_minus",
+        -78.8,
+        18.4,
+        "diag_minus_AB",
+        NEEF_2024_MD_TEMPERATURE_K,
+        "ab-initio-quality MD plus fragment-orbital DFT on extracted dimers",
+        NEEF_2024_SOURCE_DOI,
+        NEEF_2024_PEER_REVIEWED,
+    ),
+)
+NEEF_2024_MEAN_TRANSLATIONAL_FLUCTUATION_ANGSTROM = 0.21
+
+
+# A single-source signed room-temperature experimental hopping reference now
+# exists (Neef), but it is still a preprint. The stricter peer-reviewed,
+# temperature-matched electronic parameterization therefore remains open.
 UNRESOLVED_PENTACENE_FIELDS = (
-    "single_source_signed_hopping_parameterization",
+    "peer_reviewed_temperature_matched_signed_hopping_parameterization",
     "bond_resolved_peierls_derivatives",
     "effective_bond_stiffness_matrices",
     "screened_onsite_hubbard_u",
@@ -203,14 +306,7 @@ def _candidate_transport_lattice(
     n1: int,
     n2: int,
 ) -> PeriodicMolecularLattice2D:
-    """Return the minimal connected herringbone graph for one a-b layer.
-
-    The two same-basis a-axis contacts are each represented by one translational
-    family; their reverse neighbours are generated automatically because source
-    and target have the same basis. For A-B diagonals this is not true: each
-    physical direction needs both +d and -d representatives. Consequently the
-    graph has six bond families but only four independent hopping parameters.
-    """
+    """Return the minimal connected herringbone graph for one a-b layer."""
     geometry = _projected_lattice(record, n1, n2)
     return PeriodicMolecularLattice2D(
         n1=geometry.n1,
@@ -263,9 +359,6 @@ def pentacene_90k_dewijs_homo_model(
             ("diag_minus_AB_forward", 0.091),
             ("diag_minus_AB_backward", 0.091),
         ),
-        # de Wijs et al. fit an inequivalent-molecule offset e=42 meV. Which
-        # molecule is called A is a basis-label choice; this convention puts the
-        # lower onsite energy on A.
         onsite_energies_ev=(-DEWIJS_2003_HOMO_ONSITE_DIFFERENCE_EV, 0.0),
     )
 
@@ -273,15 +366,35 @@ def pentacene_90k_dewijs_homo_model(
 def pentacene_293k_cross_source_hole_model(
     n1: int, n2: int
 ) -> MolecularTightBindingModel:
-    """Return the provenance-labelled 293 K signed *candidate* hole model.
-
-    This object must not yet be used to label a polaron or bipolaron result as a
-    final material-specific pentacene prediction. It is intended for G5b band
-    validation and for determining whether the signed room-temperature magnitude
-    pattern is internally consistent with the herringbone band topology.
-    """
+    """Return the provenance-labelled 293 K signed *candidate* hole model."""
     return MolecularTightBindingModel(
         lattice=pentacene_293k_candidate_transport_lattice(n1, n2),
         bond_transfer_integrals_ev=PENTACENE_293K_CROSS_SOURCE_HOLE_HOPPINGS_EV,
+        onsite_energies_ev=(0.0, 0.0),
+    )
+
+
+def pentacene_room_temperature_neef_arpes_homo_model(
+    n1: int,
+    n2: int,
+) -> MolecularTightBindingModel:
+    """Return the Neef room-temperature ARPES three-parameter HOMO reference.
+
+    The experimental fit itself is a single-source signed room-temperature
+    result. The executable finite graph uses the Mattheus 293 K molecular-center
+    geometry as the closest crystallographically explicit bulk host. This 2 K
+    difference is documented rather than interpreted as a fitted structural
+    correction.
+    """
+    return MolecularTightBindingModel(
+        lattice=pentacene_293k_candidate_transport_lattice(n1, n2),
+        bond_transfer_integrals_ev=(
+            ("a_AA", 0.035),
+            ("a_BB", 0.035),
+            ("diag_plus_AB_forward", 0.055),
+            ("diag_plus_AB_backward", 0.055),
+            ("diag_minus_AB_forward", -0.070),
+            ("diag_minus_AB_backward", -0.070),
+        ),
         onsite_energies_ev=(0.0, 0.0),
     )
