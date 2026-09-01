@@ -51,7 +51,7 @@ def test_modal_evidence_rejects_unphysical_values_or_false_direct_promotion() ->
         ModalEpcEvidence("LT", "U", 0.0, 0.27, "TL", 0.67)
     with pytest.raises(ValueError, match="non-negative"):
         ModalEpcEvidence("LT", "U", 26.7, -0.01, "TL", 0.67)
-    with pytest.raises(ValueError, match="\[0, 1\]"):
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
         ModalEpcEvidence("LT", "U", 26.7, 0.27, "TL", 1.2)
     with pytest.raises(ValueError, match="direct-G3-compatible"):
         ModalEpcEvidence("LT", "U", 26.7, 0.27, "TL", 0.67, direct_g3_compatible=True)
