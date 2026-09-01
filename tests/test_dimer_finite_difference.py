@@ -160,7 +160,7 @@ def test_scan_rejects_missing_central_partner() -> None:
             and item.amount == plan.translation_steps_angstrom[0]
         )
     )
-    with pytest.raises(ValueError, match="missing \+/- finite-difference sample"):
+    with pytest.raises(ValueError, match=r"missing \+/- finite-difference sample"):
         analyze_finite_difference_scan(samples, plan)
 
 
