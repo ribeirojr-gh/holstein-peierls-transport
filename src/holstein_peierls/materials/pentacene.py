@@ -92,7 +92,7 @@ PENTACENE_90K = PentaceneCrystalRecord(
     gamma_deg=84.415,
     basis_fractional_3d=((0.0, 0.0, 0.0), (0.5, 0.5, 0.0)),
     source_doi="10.1107/S010827010100703X",
-    ccdc_id="170185",
+    ccdc_id="170187",
 )
 
 
