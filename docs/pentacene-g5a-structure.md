@@ -4,11 +4,13 @@
 
 G1-G4 established a material-agnostic periodic molecular graph, one-particle Hamiltonian, generalized Peierls algebra, and correlated-pair interaction/observable layer. G5 begins assigning a real material, but only where the evidence is sufficiently unambiguous.
 
-G5a therefore fixes the **293 K bulk pentacene crystal geometry** and records published electronic-coupling evidence without prematurely converting unsigned transport couplings into a signed tight-binding model.
+G5a therefore fixed the **293 K bulk pentacene crystal geometry** and recorded published electronic-coupling evidence without prematurely converting unsigned transport couplings into a signed tight-binding model.
+
+> **G5b correction.** The original G5a implementation described four independent geometric hopping groups and represented each A-B diagonal by only one translational `BondFamily`. That representation was sufficient to identify the four parameter groups, but it was not a complete finite herringbone transport graph: unlike same-basis A-A or B-B bonds, an A-B family does not automatically generate the opposite displacement when the Hermitian matrix element is added. G5b therefore retains four independent hopping groups but represents the two diagonal groups by explicit forward/backward families, giving six translational bond families in total. This correction is documented in `docs/pentacene-g5b-signed-band.md`.
 
 ## Selected crystal
 
-The initial target is the 293 K single-crystal structure of Mattheus et al., Acta Crystallographica C 57, 939-941 (2001), DOI `10.1107/S010827010100703X`, CCDC 170186.
+The initial target is the 293 K single-crystal structure of Mattheus et al., *Acta Crystallographica C* **57**, 939-941 (2001), DOI `10.1107/S010827010100703X`, CCDC 170186.
 
 The reported triclinic cell is
 
@@ -35,69 +37,74 @@ The crystallographic report places inversion centers on the two molecules at fra
 
 This is a molecular-center lattice representation, not an atomistic reconstruction of each pentacene molecule.
 
-## Minimal in-plane transport graph
+## Minimal in-plane parameter groups
 
-The structural layer exposes a candidate four-family herringbone graph:
+The structural layer identified four independent nearest-neighbour hopping groups in the `a-b` herringbone plane:
 
-- `a_AA`: A to A translated by `(1,0)`;
-- `a_BB`: B to B translated by `(1,0)`;
-- `diag_plus_AB`: A to B in the same primitive cell, displacement `(a+b)/2`;
-- `diag_minus_AB`: A to B in the neighboring `-a` cell, displacement `(-a+b)/2`.
+- one same-basis A-A group along `a`;
+- one same-basis B-B group along `a`;
+- one A-B group along `+(a+b)/2` and its opposite neighbour;
+- one A-B group along `+(a-b)/2` and its opposite neighbour.
 
-These are geometric labels only. They represent the two inequivalent same-orientation paths along the crystallographic a direction and the two inequivalent A-B diagonal directions in the a-b plane.
+After the G5b connectivity correction these four independent parameter groups are represented by six explicit translational bond families:
 
-They are deliberately **not** yet labeled A, A-prime, B, or C from any particular electronic-structure paper.
+- `a_AA`;
+- `a_BB`;
+- `diag_plus_AB_forward` and `diag_plus_AB_backward`;
+- `diag_minus_AB_forward` and `diag_minus_AB_backward`.
+
+The duplication of each diagonal is topological, not a new material parameter: the forward and backward members share the same transfer integral in the undistorted inversion-symmetric reference crystal.
 
 ## Published hole-coupling evidence
 
-Stehr et al., Phys. Rev. B 83, 155208 (2011), DOI `10.1103/PhysRevB.83.155208`, report four dominant pentacene hole-coupling magnitudes
+Stehr et al., *Phys. Rev. B* **83**, 155208 (2011), DOI `10.1103/PhysRevB.83.155208`, report four dominant pentacene hole-coupling magnitudes
 
-- `90.69 meV`;
-- `55.05 meV`;
-- `39.68 meV`;
-- `36.62 meV`;
+- `V1 = 90.69 meV`;
+- `V2 = 55.05 meV`;
+- `V3 = 39.68 meV`;
+- `V4 = 36.62 meV`;
 
 with a hole reorganization energy of `92 meV`.
 
-Comparative literature identifies the two lower-magnitude paths with the two inequivalent a-axis contacts and the two higher-magnitude paths with the two diagonal herringbone contacts. However, the Marcus transport calculation uses coupling magnitudes; the evidence currently stored in G5a does not establish a signed one-to-one tight-binding assignment to `a_AA`, `a_BB`, `diag_plus_AB`, and `diag_minus_AB` at the level required for band-structure validation.
+The full-text discussion identifies the largest hole coupling with the `[1 -1 0]` direction and the second largest with `[1 1 0]`. G5b therefore maps the two large magnitudes to the two diagonal herringbone groups and the two lower magnitudes to the two same-basis `a`-axis contacts. The Marcus-rate calculation still does not provide the orbital-phase signs required by a coherent tight-binding Hamiltonian, so these records remain `signed_value_known=False`.
 
-Consequently G5a stores these values as `TransferIntegralEvidence` records with `signed_value_known=False` and only a coarse geometry group (`a_axis_same_basis` or `diagonal_AB`).
+## Deliberately unresolved fields after G5a
 
-## Deliberately unresolved fields
+G5a deliberately left unresolved:
 
-The material module keeps the following quantities explicitly unresolved:
-
-- signed hopping assignment;
+- a signed hopping assignment;
 - bond-resolved Peierls derivatives;
 - effective bond stiffness matrices;
-- screened onsite Hubbard U;
-- screened short-range contact interactions V_ij;
+- screened onsite Hubbard `U`;
+- screened short-range contact interactions `V_ij`;
 - long-range dielectric convention;
 - mapping from molecular reorganization energy to the effective Holstein coordinate.
 
-This prevents an incomplete record from being silently promoted into a runnable "pentacene" bipolaron parameter set.
+G5b partially resolves the first item by adding a signed 90 K reference and a provenance-labelled cross-source 293 K candidate. A **single-source signed 293 K parameterization** remains unresolved, as do all interaction and electron-phonon quantities.
 
-## Validation
+## Original G5a validation record
 
-G5a-specific local tests verify:
+The G5a-specific local tests verified:
 
-1. the projected a and b lengths and gamma angle reproduce the Mattheus 293 K cell;
+1. the projected `a` and `b` lengths and `gamma` angle reproduce the Mattheus 293 K cell;
 2. the projected A/B basis reproduces the reported inversion-center positions;
-3. the four candidate geometric bond families have the intended crystallographic displacement vectors;
-4. the Stehr values remain unsigned evidence rather than model hoppings;
+3. the four independent geometric hopping groups have the intended crystallographic displacement vectors;
+4. the Stehr values remain unsigned evidence rather than promoted model hoppings;
 5. all scientifically blocking parameters remain explicitly unresolved.
 
-Test record:
+Original test record at merge:
 
 - G5a-specific tests: `5/5` passed;
 - complete project suite after G5a: `76/76` passed.
 
+The G5b test suite supersedes the transport-graph portion of item 3 by requiring the complete six-family finite graph and degree-six nearest-neighbour connectivity.
+
 ## Next research task
 
-G5b should resolve the **signed hopping assignment** before any pentacene band structure is claimed. Preferred evidence, in order, is:
+After G5b validates the signed noninteracting band layer, the project should proceed in this order:
 
-1. signed transfer integrals computed on the same Mattheus 293 K geometry with explicit pair definitions;
-2. an original electronic-structure source whose figures/tables map signs and molecular pairs unambiguously onto the four G5a geometric families;
-3. if neither is available, a small reproducible electronic-structure calculation rather than an inferred sign assignment from Marcus magnitudes.
-
-Only after G5b passes a noninteracting band/symmetry check should the project begin mapping Peierls derivatives and elastic modes for material-specific relaxation.
+1. seek or compute a single-source signed 293 K hopping set and compare it with the cross-source candidate;
+2. map the `92 meV` molecular reorganization energy to a documented effective Holstein convention;
+3. obtain bond-resolved Peierls derivatives together with compatible stiffness/mode information;
+4. obtain internally consistent screened `U`, short-range `V_ij`, and long-range dielectric screening;
+5. only then enable graph-based material-specific polaron/bipolaron relaxation.
