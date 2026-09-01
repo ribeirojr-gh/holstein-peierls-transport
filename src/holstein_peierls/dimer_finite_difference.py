@@ -289,11 +289,16 @@ def prepare_scan_geometries(
 def _coordinate_samples(
     samples: tuple[TransferIntegralSample, ...], coordinate: DimerCoordinate
 ) -> dict[float, float]:
-    selected = {
-        float(item.perturbation.amount): float(item.transfer_integral_ev)
-        for item in samples
-        if item.perturbation.coordinate_label == coordinate.label
-    }
+    selected: dict[float, float] = {}
+    for item in samples:
+        if item.perturbation.coordinate_label != coordinate.label:
+            continue
+        amount = float(item.perturbation.amount)
+        if amount in selected:
+            raise ValueError(
+                f"duplicate finite-difference sample for {coordinate.label} at {amount}"
+            )
+        selected[amount] = float(item.transfer_integral_ev)
     return selected
 
 
