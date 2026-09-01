@@ -23,11 +23,26 @@ from .pentacene import (
     pentacene_90k_dewijs_reference_lattice,
     pentacene_room_temperature_neef_arpes_homo_model,
 )
+from .pentacene_epc import (
+    GNOLI_2025_DATASET_DOI,
+    GNOLI_2025_EPC_FINITE_DISPLACEMENT_ANGSTROM,
+    GNOLI_2025_LT_DOMINANT_EPC,
+    GNOLI_2025_REPRESENTATION,
+    GNOLI_2025_SOURCE_DOI,
+    ModalEpcEvidence,
+    g5d_projection_requirements,
+)
 
 __all__ = [
     "DEWIJS_2003_HOMO_ONSITE_DIFFERENCE_EV",
     "DEWIJS_2003_HOMO_SIGNED_HOPPINGS_EV",
     "DEWIJS_2003_SOURCE_DOI",
+    "GNOLI_2025_DATASET_DOI",
+    "GNOLI_2025_EPC_FINITE_DISPLACEMENT_ANGSTROM",
+    "GNOLI_2025_LT_DOMINANT_EPC",
+    "GNOLI_2025_REPRESENTATION",
+    "GNOLI_2025_SOURCE_DOI",
+    "ModalEpcEvidence",
     "NEEF_2024_ARPES_HOLE_HOPPINGS",
     "NEEF_2024_MD_HOLE_HOPPING_STATISTICS",
     "NEEF_2024_MD_TEMPERATURE_K",
@@ -40,6 +55,7 @@ __all__ = [
     "PENTACENE_90K",
     "STEHR_2011_HOLE_COUPLINGS",
     "UNRESOLVED_PENTACENE_FIELDS",
+    "g5d_projection_requirements",
     "pentacene_293k_candidate_transport_lattice",
     "pentacene_293k_cross_source_hole_model",
     "pentacene_293k_projected_lattice",
