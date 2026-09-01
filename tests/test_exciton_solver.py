@@ -14,6 +14,7 @@ def test_noninteracting_energy_is_sum_of_one_particle_band_minima() -> None:
     parameters = ExcitonParameters(
         nx=3,
         ny=3,
+        exciton_position=5,
         electron_j0x=0.10,
         electron_j0y=0.02,
         hole_j0x=0.07,
@@ -34,6 +35,7 @@ def test_reduced_density_matrices_each_have_trace_one() -> None:
     parameters = ExcitonParameters(
         nx=3,
         ny=3,
+        exciton_position=5,
         onsite_attraction=0.35,
     )
     state = solve_exciton_ground_state(LatticeState.zeros(3, 3), parameters)
@@ -47,6 +49,7 @@ def test_strong_atomic_onsite_attraction_produces_frenkel_pair() -> None:
     parameters = ExcitonParameters(
         nx=2,
         ny=2,
+        exciton_position=1,
         electron_j0x=0.0,
         electron_j0y=0.0,
         hole_j0x=0.0,
@@ -68,6 +71,7 @@ def test_atomic_nearest_neighbor_attraction_produces_ct_pair() -> None:
     parameters = ExcitonParameters(
         nx=4,
         ny=4,
+        exciton_position=6,
         electron_j0x=0.0,
         electron_j0y=0.0,
         hole_j0x=0.0,
@@ -91,7 +95,9 @@ def test_atomic_nearest_neighbor_attraction_produces_ct_pair() -> None:
 
 
 def test_equal_carrier_control_has_equal_electron_and_hole_densities() -> None:
-    parameters = ExcitonParameters(nx=3, ny=3, onsite_attraction=0.525)
+    parameters = ExcitonParameters(
+        nx=3, ny=3, exciton_position=5, onsite_attraction=0.525
+    )
     state = solve_exciton_ground_state(LatticeState.zeros(3, 3), parameters)
     assert np.allclose(state.electron_density, state.hole_density, rtol=0.0, atol=1.0e-11)
 
