@@ -17,3 +17,27 @@ jobs:
         run: python -m pip install -e '.[dev]'
       - name: Run tests
         run: pytest
+
+  exciton-reference-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install package
+        run: python -m pip install -e '.[dev]'
+      - name: Run 6x6 reference exciton branches
+        run: |
+          mkdir -p exciton-smoke
+          python experiments/exciton_reference_branch_benchmark.py \
+            --size 6 \
+            --onsite-attraction 0.525 \
+            --max-iterations 1600 \
+            --output exciton-smoke/result.json
+      - name: Upload result
+        uses: actions/upload-artifact@v4
+        with:
+          name: exciton-reference-smoke-${{ github.sha }}
+          path: exciton-smoke/result.json
