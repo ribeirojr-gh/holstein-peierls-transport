@@ -27,6 +27,7 @@ def test_exciton_lattice_gradient_matches_finite_difference(field: str) -> None:
     parameters = ExcitonParameters(
         nx=3,
         ny=3,
+        exciton_position=5,
         electron_j0x=0.09,
         electron_j0y=0.025,
         hole_j0x=0.06,
