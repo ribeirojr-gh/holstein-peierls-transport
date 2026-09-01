@@ -32,11 +32,24 @@ from .pentacene_epc import (
     ModalEpcEvidence,
     g5d_projection_requirements,
 )
+from .pentacene_g5e import (
+    NEEF_2024_FODFT_PROTOCOL,
+    PENTACENE_G5E_G3_MODE_UNITS,
+    PENTACENE_G5E_ORIENTED_BOND_FAMILIES,
+    PENTACENE_G5E_ROTATION_STEPS_DEGREE,
+    PENTACENE_G5E_TRANSLATION_STEPS_ANGSTROM,
+    FoDftReferenceProtocol,
+    pentacene_g5e_displaced_calculation_count_per_oriented_bond,
+    pentacene_g5e_full_oriented_scan_calculation_count,
+    pentacene_g5e_promotion_requirements,
+    pentacene_g5e_scan_plan,
+)
 
 __all__ = [
     "DEWIJS_2003_HOMO_ONSITE_DIFFERENCE_EV",
     "DEWIJS_2003_HOMO_SIGNED_HOPPINGS_EV",
     "DEWIJS_2003_SOURCE_DOI",
+    "FoDftReferenceProtocol",
     "GNOLI_2025_DATASET_DOI",
     "GNOLI_2025_EPC_FINITE_DISPLACEMENT_ANGSTROM",
     "GNOLI_2025_LT_DOMINANT_EPC",
@@ -44,6 +57,7 @@ __all__ = [
     "GNOLI_2025_SOURCE_DOI",
     "ModalEpcEvidence",
     "NEEF_2024_ARPES_HOLE_HOPPINGS",
+    "NEEF_2024_FODFT_PROTOCOL",
     "NEEF_2024_MD_HOLE_HOPPING_STATISTICS",
     "NEEF_2024_MD_TEMPERATURE_K",
     "NEEF_2024_MEAN_TRANSLATIONAL_FLUCTUATION_ANGSTROM",
@@ -53,6 +67,10 @@ __all__ = [
     "PENTACENE_293K_CROSS_SOURCE_HOLE_HOPPINGS_EV",
     "PENTACENE_293K_CROSS_SOURCE_STATUS",
     "PENTACENE_90K",
+    "PENTACENE_G5E_G3_MODE_UNITS",
+    "PENTACENE_G5E_ORIENTED_BOND_FAMILIES",
+    "PENTACENE_G5E_ROTATION_STEPS_DEGREE",
+    "PENTACENE_G5E_TRANSLATION_STEPS_ANGSTROM",
     "STEHR_2011_HOLE_COUPLINGS",
     "UNRESOLVED_PENTACENE_FIELDS",
     "g5d_projection_requirements",
@@ -61,5 +79,9 @@ __all__ = [
     "pentacene_293k_projected_lattice",
     "pentacene_90k_dewijs_homo_model",
     "pentacene_90k_dewijs_reference_lattice",
+    "pentacene_g5e_displaced_calculation_count_per_oriented_bond",
+    "pentacene_g5e_full_oriented_scan_calculation_count",
+    "pentacene_g5e_promotion_requirements",
+    "pentacene_g5e_scan_plan",
     "pentacene_room_temperature_neef_arpes_homo_model",
 ]
