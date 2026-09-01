@@ -12,6 +12,7 @@ def test_reference_frenkel_exciton_relaxes_to_stationary_state() -> None:
     parameters = ExcitonParameters(
         nx=4,
         ny=4,
+        exciton_position=6,
         onsite_attraction=0.525,
         max_iterations=1200,
     )
