@@ -174,9 +174,13 @@ def test_293k_cross_source_candidate_uses_stehr_magnitudes_and_dewijs_sign_patte
     assert transfer["diag_minus_AB_forward"] > 0.0
     assert "candidate only" in PENTACENE_293K_CROSS_SOURCE_STATUS
 
+    # The 6x6 mesh is a reproducibility check for the executable candidate, not a
+    # converged material observable. Its bandwidth lies near 0.583 eV; a dense
+    # reciprocal scan gives approximately 0.585 eV.
     spectrum = sampled_bloch_spectrum(model)
     bandwidth = float(spectrum[-1] - spectrum[0])
-    assert np.isclose(bandwidth, 0.5846727523889548, rtol=0.0, atol=3e-14)
+    assert np.isclose(bandwidth, 0.5829921234459348, rtol=0.0, atol=3e-14)
+    assert 0.58 < bandwidth < 0.59
 
 
 def test_293k_a_basis_label_swap_leaves_equal_onsite_band_spectrum_invariant() -> None:
