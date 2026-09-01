@@ -1,6 +1,7 @@
 """Static electron-hole exciton reference solver."""
 
 from .branches import (
+    DEFAULT_BRANCH_ENERGY_TIE_TOLERANCE_EV,
     DEFAULT_EXCITON_BRANCHES,
     ExcitonBranchOutcome,
     ExcitonBranchScan,
@@ -25,6 +26,7 @@ from .solver import (
 )
 
 __all__ = [
+    "DEFAULT_BRANCH_ENERGY_TIE_TOLERANCE_EV",
     "DEFAULT_EXCITON_BRANCHES",
     "ExcitonBranchOutcome",
     "ExcitonBranchScan",
