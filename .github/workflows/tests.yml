@@ -18,7 +18,11 @@ jobs:
       - name: Run tests
         run: pytest
 
-  exciton-reference-smoke:
+  exciton-reference-20x20:
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [frenkel, ct_x, ct_y, diagonal, separated]
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -28,16 +32,17 @@ jobs:
           python-version: '3.12'
       - name: Install package
         run: python -m pip install -e '.[dev]'
-      - name: Run 10x10 reference exciton branches
+      - name: Run strict 20x20 branch
         run: |
-          mkdir -p exciton-smoke
+          mkdir -p exciton-20x20
           python experiments/exciton_reference_branch_benchmark.py \
-            --size 10 \
+            --size 20 \
             --onsite-attraction 0.525 \
-            --max-iterations 1800 \
-            --output exciton-smoke/result.json
+            --max-iterations 2200 \
+            --mode ${{ matrix.mode }} \
+            --output exciton-20x20/${{ matrix.mode }}.json
       - name: Upload result
         uses: actions/upload-artifact@v4
         with:
-          name: exciton-reference-10x10-${{ github.sha }}
-          path: exciton-smoke/result.json
+          name: exciton-reference-20x20-${{ matrix.mode }}-${{ github.sha }}
+          path: exciton-20x20/${{ matrix.mode }}.json
