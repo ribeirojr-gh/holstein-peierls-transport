@@ -5,6 +5,7 @@ def test_branch_scan_requires_convergence_and_selects_lowest_converged_state() -
     parameters = ExcitonParameters(
         nx=3,
         ny=3,
+        exciton_position=5,
         electron_j0x=0.0,
         electron_j0y=0.0,
         hole_j0x=0.0,
