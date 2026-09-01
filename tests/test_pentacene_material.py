@@ -5,6 +5,12 @@ import numpy as np
 from holstein_peierls.materials.pentacene import (
     DEWIJS_2003_HOMO_ONSITE_DIFFERENCE_EV,
     DEWIJS_2003_HOMO_SIGNED_HOPPINGS_EV,
+    NEEF_2024_ARPES_HOLE_HOPPINGS,
+    NEEF_2024_MD_HOLE_HOPPING_STATISTICS,
+    NEEF_2024_MD_TEMPERATURE_K,
+    NEEF_2024_MEAN_TRANSLATIONAL_FLUCTUATION_ANGSTROM,
+    NEEF_2024_PEER_REVIEWED,
+    NEEF_2024_SOURCE_DOI,
     PENTACENE_293K,
     PENTACENE_293K_CROSS_SOURCE_HOLE_HOPPINGS_EV,
     PENTACENE_293K_CROSS_SOURCE_STATUS,
@@ -15,6 +21,7 @@ from holstein_peierls.materials.pentacene import (
     pentacene_293k_cross_source_hole_model,
     pentacene_293k_projected_lattice,
     pentacene_90k_dewijs_homo_model,
+    pentacene_room_temperature_neef_arpes_homo_model,
 )
 from holstein_peierls.molecular_hamiltonian import (
     MolecularTightBindingModel,
@@ -120,10 +127,6 @@ def test_dewijs_90k_signed_reference_reproduces_reported_homo_bandwidth() -> Non
     spectrum = sampled_bloch_spectrum(model)
     bandwidth = float(spectrum[-1] - spectrum[0])
 
-    # The three-parameter signed fit gives 0.589498 eV for the complete two-band
-    # HOMO complex, consistent with the approximately 0.6 eV width reported by
-    # de Wijs et al. The even 8x8 reciprocal mesh contains the M point where both
-    # extrema occur for this fitted model.
     assert np.isclose(bandwidth, 0.5894980915999644, rtol=0.0, atol=2e-14)
     assert abs(bandwidth - 0.6) < 0.02
     assert DEWIJS_2003_HOMO_SIGNED_HOPPINGS_EV == (
@@ -133,6 +136,7 @@ def test_dewijs_90k_signed_reference_reproduces_reported_homo_bandwidth() -> Non
     )
     assert DEWIJS_2003_HOMO_ONSITE_DIFFERENCE_EV == 0.042
     assert PENTACENE_90K.temperature_k == 90.0
+    assert PENTACENE_90K.ccdc_id == "170187"
 
 
 def test_dewijs_ab_sign_flip_is_a_basis_gauge_transformation() -> None:
@@ -174,9 +178,6 @@ def test_293k_cross_source_candidate_uses_stehr_magnitudes_and_dewijs_sign_patte
     assert transfer["diag_minus_AB_forward"] > 0.0
     assert "candidate only" in PENTACENE_293K_CROSS_SOURCE_STATUS
 
-    # The 6x6 mesh is a reproducibility check for the executable candidate, not a
-    # converged material observable. Its bandwidth lies near 0.583 eV; a dense
-    # reciprocal scan gives approximately 0.585 eV.
     spectrum = sampled_bloch_spectrum(model)
     bandwidth = float(spectrum[-1] - spectrum[0])
     assert np.isclose(bandwidth, 0.5829921234459348, rtol=0.0, atol=3e-14)
@@ -211,9 +212,78 @@ def test_293k_a_basis_label_swap_leaves_equal_onsite_band_spectrum_invariant() -
         assert np.allclose(candidate, expected, rtol=0.0, atol=2e-15)
 
 
+def test_neef_arpes_reference_is_signed_single_source_room_temperature_evidence() -> None:
+    assert NEEF_2024_SOURCE_DOI == "10.48550/arXiv.2412.06030"
+    assert NEEF_2024_PEER_REVIEWED is False
+    assert [(item.label, item.value_mev, item.uncertainty_mev) for item in NEEF_2024_ARPES_HOLE_HOPPINGS] == [
+        ("t_a", 35.0, 10.0),
+        ("t_plus", 55.0, 5.0),
+        ("t_minus", -70.0, 5.0),
+    ]
+    assert [item.temperature_description for item in NEEF_2024_ARPES_HOLE_HOPPINGS] == [
+        "room temperature",
+        "room temperature",
+        "room temperature",
+    ]
+    assert all("ARPES" in item.evidence_type for item in NEEF_2024_ARPES_HOLE_HOPPINGS)
+    assert all(not item.peer_reviewed for item in NEEF_2024_ARPES_HOLE_HOPPINGS)
+
+
+def test_neef_room_temperature_model_matches_published_analytic_herringbone_hamiltonian() -> None:
+    model = pentacene_room_temperature_neef_arpes_homo_model(5, 4)
+    reciprocal = reciprocal_vectors_per_angstrom(model.lattice)
+    k = 0.231 * reciprocal[:, 0] + 0.347 * reciprocal[:, 1]
+    candidate = bloch_hamiltonian(model, k)
+
+    a = np.asarray(model.lattice.a1_angstrom)
+    b = np.asarray(model.lattice.a2_angstrom)
+    ka = float(np.dot(k, a))
+    kb = float(np.dot(k, b))
+    h0 = 2.0 * 0.035 * np.cos(ka)
+    h1 = (
+        2.0 * 0.055 * np.cos(0.5 * (ka + kb))
+        + 2.0 * (-0.070) * np.cos(0.5 * (ka - kb))
+    )
+    expected = np.array(((h0, h1), (h1, h0)), dtype=np.complex128)
+    assert np.allclose(candidate, expected, rtol=0.0, atol=2e-15)
+
+
+def test_neef_and_dewijs_share_the_same_frustrated_sign_topology_up_to_basis_gauge() -> None:
+    dewijs_ta = dict(DEWIJS_2003_HOMO_SIGNED_HOPPINGS_EV)["a_same_basis"]
+    dewijs_plus = -dict(DEWIJS_2003_HOMO_SIGNED_HOPPINGS_EV)["diag_plus_AB"]
+    dewijs_minus = -dict(DEWIJS_2003_HOMO_SIGNED_HOPPINGS_EV)["diag_minus_AB"]
+    neef = {item.label: item.value_mev for item in NEEF_2024_ARPES_HOLE_HOPPINGS}
+
+    assert dewijs_ta > 0.0 and dewijs_plus > 0.0 and dewijs_minus < 0.0
+    assert neef["t_a"] > 0.0 and neef["t_plus"] > 0.0 and neef["t_minus"] < 0.0
+    assert dewijs_ta * dewijs_plus * dewijs_minus < 0.0
+    assert neef["t_a"] * neef["t_plus"] * neef["t_minus"] < 0.0
+
+
+def test_neef_295k_md_statistics_are_stored_as_disorder_evidence_not_peierls_parameters() -> None:
+    assert NEEF_2024_MD_TEMPERATURE_K == 295.0
+    assert [(item.label, item.mean_mev, item.standard_deviation_mev) for item in NEEF_2024_MD_HOLE_HOPPING_STATISTICS] == [
+        ("t_a", 32.0, 12.0),
+        ("t_plus", 39.5, 18.0),
+        ("t_minus", -78.8, 18.4),
+    ]
+    assert all(item.temperature_k == 295.0 for item in NEEF_2024_MD_HOLE_HOPPING_STATISTICS)
+    assert all("FO-DFT" in item.method for item in NEEF_2024_MD_HOLE_HOPPING_STATISTICS)
+    assert np.isclose(NEEF_2024_MEAN_TRANSLATIONAL_FLUCTUATION_ANGSTROM, 0.21)
+
+    arpes_magnitudes = {item.label: abs(item.value_mev) for item in NEEF_2024_ARPES_HOLE_HOPPINGS}
+    relative_disorder = {
+        item.label: item.standard_deviation_mev / arpes_magnitudes[item.label]
+        for item in NEEF_2024_MD_HOLE_HOPPING_STATISTICS
+    }
+    assert np.isclose(relative_disorder["t_a"], 12.0 / 35.0)
+    assert np.isclose(relative_disorder["t_plus"], 18.0 / 55.0)
+    assert np.isclose(relative_disorder["t_minus"], 18.4 / 70.0)
+
+
 def test_material_record_keeps_remaining_blocking_parameters_explicitly_unresolved() -> None:
     required = {
-        "single_source_signed_hopping_parameterization",
+        "peer_reviewed_temperature_matched_signed_hopping_parameterization",
         "bond_resolved_peierls_derivatives",
         "effective_bond_stiffness_matrices",
         "screened_onsite_hubbard_u",
@@ -221,5 +291,6 @@ def test_material_record_keeps_remaining_blocking_parameters_explicitly_unresolv
         "long_range_dielectric_convention",
     }
     assert required.issubset(set(UNRESOLVED_PENTACENE_FIELDS))
+    assert "single_source_signed_hopping_parameterization" not in UNRESOLVED_PENTACENE_FIELDS
     assert PENTACENE_293K.source_doi == "10.1107/S010827010100703X"
     assert PENTACENE_293K.ccdc_id == "170186"
