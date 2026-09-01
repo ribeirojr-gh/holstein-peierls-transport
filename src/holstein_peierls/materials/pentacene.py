@@ -102,8 +102,6 @@ PENTACENE_293K = PentaceneCrystalRecord(
     alpha_deg=76.475,
     beta_deg=87.682,
     gamma_deg=84.684,
-    # Mattheus et al. place crystallographic inversion centers on the two
-    # molecules at (0,0,0) and (1/2,1/2,0).
     basis_fractional_3d=((0.0, 0.0, 0.0), (0.5, 0.5, 0.0)),
     source_doi="10.1107/S010827010100703X",
     ccdc_id="170186",
@@ -122,51 +120,13 @@ PENTACENE_90K = PentaceneCrystalRecord(
     ccdc_id="170187",
 )
 
-
-# Stehr et al. use the 293 K Mattheus crystal and report magnitudes because their
-# Marcus rates depend on |V|^2. Their text identifies V1 with [1 -1 0] and V2
-# with [1 1 0]. V3/V4 are the two same-basis a-axis contacts in the minimal
-# in-plane graph. The A/B assignment of V3 versus V4 is basis-label dependent.
 STEHR_2011_HOLE_COUPLINGS = (
-    TransferIntegralEvidence(
-        "V1",
-        90.69,
-        (1, -1, 0),
-        "10.1103/PhysRevB.83.155208",
-        False,
-        "diag_minus_AB",
-    ),
-    TransferIntegralEvidence(
-        "V2",
-        55.05,
-        (1, 1, 0),
-        "10.1103/PhysRevB.83.155208",
-        False,
-        "diag_plus_AB",
-    ),
-    TransferIntegralEvidence(
-        "V3",
-        39.68,
-        (1, 0, 0),
-        "10.1103/PhysRevB.83.155208",
-        False,
-        "a_axis_same_basis",
-    ),
-    TransferIntegralEvidence(
-        "V4",
-        36.62,
-        (1, 0, 0),
-        "10.1103/PhysRevB.83.155208",
-        False,
-        "a_axis_same_basis",
-    ),
+    TransferIntegralEvidence("V1", 90.69, (1, -1, 0), "10.1103/PhysRevB.83.155208", False, "diag_minus_AB"),
+    TransferIntegralEvidence("V2", 55.05, (1, 1, 0), "10.1103/PhysRevB.83.155208", False, "diag_plus_AB"),
+    TransferIntegralEvidence("V3", 39.68, (1, 0, 0), "10.1103/PhysRevB.83.155208", False, "a_axis_same_basis"),
+    TransferIntegralEvidence("V4", 36.62, (1, 0, 0), "10.1103/PhysRevB.83.155208", False, "a_axis_same_basis"),
 )
 
-
-# Signed HOMO transfer integrals from the de Wijs et al. single-layer TB fit on
-# the 90 K Mattheus structure. This is one particular molecular-orbital gauge:
-# flipping the phase of every B-basis HOMO reverses both A-B signs and leaves the
-# band eigenvalues invariant.
 DEWIJS_2003_HOMO_SIGNED_HOPPINGS_EV = (
     ("a_same_basis", 0.031),
     ("diag_plus_AB", -0.056),
@@ -175,10 +135,6 @@ DEWIJS_2003_HOMO_SIGNED_HOPPINGS_EV = (
 DEWIJS_2003_HOMO_ONSITE_DIFFERENCE_EV = 0.042
 DEWIJS_2003_SOURCE_DOI = "10.1016/S0379-6779(03)00020-1"
 
-
-# Cross-source 293 K candidate retained for comparison with the later G5c ARPES
-# reference. Magnitudes come from Stehr et al.; relative signs come from the de
-# Wijs band fit after fixing the molecular-orbital gauge.
 PENTACENE_293K_CROSS_SOURCE_HOLE_HOPPINGS_EV = (
     ("a_AA", 0.03968),
     ("a_BB", 0.03662),
@@ -192,85 +148,22 @@ PENTACENE_293K_CROSS_SOURCE_STATUS = (
     "de Wijs et al. HOMO band fit; not a single-source material parameterization"
 )
 
-
-# Neef et al., arXiv:2412.06030. ARPES was acquired at room temperature and
-# fitted directly with the six-neighbour / three-transfer herringbone model.
-# The work is still listed by the authors' institutions as a preprint as of
-# September 2026, so peer_reviewed=False is intentionally explicit.
 NEEF_2024_SOURCE_DOI = "10.48550/arXiv.2412.06030"
 NEEF_2024_PEER_REVIEWED = False
 NEEF_2024_ARPES_HOLE_HOPPINGS = (
-    SignedTransferIntegralReference(
-        "t_a",
-        35.0,
-        10.0,
-        "a_same_basis",
-        NEEF_2024_SOURCE_DOI,
-        "room-temperature single-crystal ARPES tight-binding fit",
-        "room temperature",
-        NEEF_2024_PEER_REVIEWED,
-    ),
-    SignedTransferIntegralReference(
-        "t_plus",
-        55.0,
-        5.0,
-        "diag_plus_AB",
-        NEEF_2024_SOURCE_DOI,
-        "room-temperature single-crystal ARPES tight-binding fit",
-        "room temperature",
-        NEEF_2024_PEER_REVIEWED,
-    ),
-    SignedTransferIntegralReference(
-        "t_minus",
-        -70.0,
-        5.0,
-        "diag_minus_AB",
-        NEEF_2024_SOURCE_DOI,
-        "room-temperature single-crystal ARPES tight-binding fit",
-        "room temperature",
-        NEEF_2024_PEER_REVIEWED,
-    ),
+    SignedTransferIntegralReference("t_a", 35.0, 10.0, "a_same_basis", NEEF_2024_SOURCE_DOI, "room-temperature single-crystal ARPES tight-binding fit", "room temperature", NEEF_2024_PEER_REVIEWED),
+    SignedTransferIntegralReference("t_plus", 55.0, 5.0, "diag_plus_AB", NEEF_2024_SOURCE_DOI, "room-temperature single-crystal ARPES tight-binding fit", "room temperature", NEEF_2024_PEER_REVIEWED),
+    SignedTransferIntegralReference("t_minus", -70.0, 5.0, "diag_minus_AB", NEEF_2024_SOURCE_DOI, "room-temperature single-crystal ARPES tight-binding fit", "room temperature", NEEF_2024_PEER_REVIEWED),
 )
 
 NEEF_2024_MD_TEMPERATURE_K = 295.0
 NEEF_2024_MD_HOLE_HOPPING_STATISTICS = (
-    DynamicalDisorderEvidence(
-        "t_a",
-        32.0,
-        12.0,
-        "a_same_basis",
-        NEEF_2024_MD_TEMPERATURE_K,
-        "ab-initio-quality MD plus fragment-orbital DFT on extracted dimers",
-        NEEF_2024_SOURCE_DOI,
-        NEEF_2024_PEER_REVIEWED,
-    ),
-    DynamicalDisorderEvidence(
-        "t_plus",
-        39.5,
-        18.0,
-        "diag_plus_AB",
-        NEEF_2024_MD_TEMPERATURE_K,
-        "ab-initio-quality MD plus fragment-orbital DFT on extracted dimers",
-        NEEF_2024_SOURCE_DOI,
-        NEEF_2024_PEER_REVIEWED,
-    ),
-    DynamicalDisorderEvidence(
-        "t_minus",
-        -78.8,
-        18.4,
-        "diag_minus_AB",
-        NEEF_2024_MD_TEMPERATURE_K,
-        "ab-initio-quality MD plus fragment-orbital DFT on extracted dimers",
-        NEEF_2024_SOURCE_DOI,
-        NEEF_2024_PEER_REVIEWED,
-    ),
+    DynamicalDisorderEvidence("t_a", 32.0, 12.0, "a_same_basis", NEEF_2024_MD_TEMPERATURE_K, "ab-initio-quality MD plus FO-DFT (fragment-orbital DFT) on extracted dimers", NEEF_2024_SOURCE_DOI, NEEF_2024_PEER_REVIEWED),
+    DynamicalDisorderEvidence("t_plus", 39.5, 18.0, "diag_plus_AB", NEEF_2024_MD_TEMPERATURE_K, "ab-initio-quality MD plus FO-DFT (fragment-orbital DFT) on extracted dimers", NEEF_2024_SOURCE_DOI, NEEF_2024_PEER_REVIEWED),
+    DynamicalDisorderEvidence("t_minus", -78.8, 18.4, "diag_minus_AB", NEEF_2024_MD_TEMPERATURE_K, "ab-initio-quality MD plus FO-DFT (fragment-orbital DFT) on extracted dimers", NEEF_2024_SOURCE_DOI, NEEF_2024_PEER_REVIEWED),
 )
 NEEF_2024_MEAN_TRANSLATIONAL_FLUCTUATION_ANGSTROM = 0.21
 
-
-# A single-source signed room-temperature experimental hopping reference now
-# exists (Neef), but it is still a preprint. The stricter peer-reviewed,
-# temperature-matched electronic parameterization therefore remains open.
 UNRESOLVED_PENTACENE_FIELDS = (
     "peer_reviewed_temperature_matched_signed_hopping_parameterization",
     "bond_resolved_peierls_derivatives",
@@ -282,31 +175,13 @@ UNRESOLVED_PENTACENE_FIELDS = (
 )
 
 
-def _projected_lattice(
-    record: PentaceneCrystalRecord,
-    n1: int,
-    n2: int,
-) -> PeriodicMolecularLattice2D:
+def _projected_lattice(record: PentaceneCrystalRecord, n1: int, n2: int) -> PeriodicMolecularLattice2D:
     a1, a2 = record.projected_ab_bravais_vectors()
-    basis = tuple(
-        MolecularBasisSite(label, position)
-        for label, position in zip(("A", "B"), record.projected_basis_fractional)
-    )
-    return PeriodicMolecularLattice2D(
-        n1=n1,
-        n2=n2,
-        a1_angstrom=a1,
-        a2_angstrom=a2,
-        basis=basis,
-    )
+    basis = tuple(MolecularBasisSite(label, position) for label, position in zip(("A", "B"), record.projected_basis_fractional))
+    return PeriodicMolecularLattice2D(n1=n1, n2=n2, a1_angstrom=a1, a2_angstrom=a2, basis=basis)
 
 
-def _candidate_transport_lattice(
-    record: PentaceneCrystalRecord,
-    n1: int,
-    n2: int,
-) -> PeriodicMolecularLattice2D:
-    """Return the minimal connected herringbone graph for one a-b layer."""
+def _candidate_transport_lattice(record: PentaceneCrystalRecord, n1: int, n2: int) -> PeriodicMolecularLattice2D:
     geometry = _projected_lattice(record, n1, n2)
     return PeriodicMolecularLattice2D(
         n1=geometry.n1,
@@ -326,28 +201,18 @@ def _candidate_transport_lattice(
 
 
 def pentacene_293k_projected_lattice(n1: int, n2: int) -> PeriodicMolecularLattice2D:
-    """Return the 293 K bulk pentacene a-b geometry without a transport graph."""
     return _projected_lattice(PENTACENE_293K, n1, n2)
 
 
-def pentacene_293k_candidate_transport_lattice(
-    n1: int, n2: int
-) -> PeriodicMolecularLattice2D:
-    """Return the connected 293 K six-edge/four-parameter herringbone graph."""
+def pentacene_293k_candidate_transport_lattice(n1: int, n2: int) -> PeriodicMolecularLattice2D:
     return _candidate_transport_lattice(PENTACENE_293K, n1, n2)
 
 
-def pentacene_90k_dewijs_reference_lattice(
-    n1: int, n2: int
-) -> PeriodicMolecularLattice2D:
-    """Return the 90 K geometry used by the de Wijs DFT/TB reference."""
+def pentacene_90k_dewijs_reference_lattice(n1: int, n2: int) -> PeriodicMolecularLattice2D:
     return _candidate_transport_lattice(PENTACENE_90K, n1, n2)
 
 
-def pentacene_90k_dewijs_homo_model(
-    n1: int, n2: int
-) -> MolecularTightBindingModel:
-    """Return the three-parameter signed HOMO reference in the de Wijs gauge."""
+def pentacene_90k_dewijs_homo_model(n1: int, n2: int) -> MolecularTightBindingModel:
     lattice = pentacene_90k_dewijs_reference_lattice(n1, n2)
     return MolecularTightBindingModel(
         lattice=lattice,
@@ -363,10 +228,7 @@ def pentacene_90k_dewijs_homo_model(
     )
 
 
-def pentacene_293k_cross_source_hole_model(
-    n1: int, n2: int
-) -> MolecularTightBindingModel:
-    """Return the provenance-labelled 293 K signed *candidate* hole model."""
+def pentacene_293k_cross_source_hole_model(n1: int, n2: int) -> MolecularTightBindingModel:
     return MolecularTightBindingModel(
         lattice=pentacene_293k_candidate_transport_lattice(n1, n2),
         bond_transfer_integrals_ev=PENTACENE_293K_CROSS_SOURCE_HOLE_HOPPINGS_EV,
@@ -374,18 +236,7 @@ def pentacene_293k_cross_source_hole_model(
     )
 
 
-def pentacene_room_temperature_neef_arpes_homo_model(
-    n1: int,
-    n2: int,
-) -> MolecularTightBindingModel:
-    """Return the Neef room-temperature ARPES three-parameter HOMO reference.
-
-    The experimental fit itself is a single-source signed room-temperature
-    result. The executable finite graph uses the Mattheus 293 K molecular-center
-    geometry as the closest crystallographically explicit bulk host. This 2 K
-    difference is documented rather than interpreted as a fitted structural
-    correction.
-    """
+def pentacene_room_temperature_neef_arpes_homo_model(n1: int, n2: int) -> MolecularTightBindingModel:
     return MolecularTightBindingModel(
         lattice=pentacene_293k_candidate_transport_lattice(n1, n2),
         bond_transfer_integrals_ev=(
