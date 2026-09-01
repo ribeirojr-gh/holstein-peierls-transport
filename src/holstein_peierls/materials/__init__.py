@@ -4,6 +4,12 @@ from .pentacene import (
     DEWIJS_2003_HOMO_ONSITE_DIFFERENCE_EV,
     DEWIJS_2003_HOMO_SIGNED_HOPPINGS_EV,
     DEWIJS_2003_SOURCE_DOI,
+    NEEF_2024_ARPES_HOLE_HOPPINGS,
+    NEEF_2024_MD_HOLE_HOPPING_STATISTICS,
+    NEEF_2024_MD_TEMPERATURE_K,
+    NEEF_2024_MEAN_TRANSLATIONAL_FLUCTUATION_ANGSTROM,
+    NEEF_2024_PEER_REVIEWED,
+    NEEF_2024_SOURCE_DOI,
     PENTACENE_293K,
     PENTACENE_293K_CROSS_SOURCE_HOLE_HOPPINGS_EV,
     PENTACENE_293K_CROSS_SOURCE_STATUS,
@@ -15,12 +21,19 @@ from .pentacene import (
     pentacene_293k_projected_lattice,
     pentacene_90k_dewijs_homo_model,
     pentacene_90k_dewijs_reference_lattice,
+    pentacene_room_temperature_neef_arpes_homo_model,
 )
 
 __all__ = [
     "DEWIJS_2003_HOMO_ONSITE_DIFFERENCE_EV",
     "DEWIJS_2003_HOMO_SIGNED_HOPPINGS_EV",
     "DEWIJS_2003_SOURCE_DOI",
+    "NEEF_2024_ARPES_HOLE_HOPPINGS",
+    "NEEF_2024_MD_HOLE_HOPPING_STATISTICS",
+    "NEEF_2024_MD_TEMPERATURE_K",
+    "NEEF_2024_MEAN_TRANSLATIONAL_FLUCTUATION_ANGSTROM",
+    "NEEF_2024_PEER_REVIEWED",
+    "NEEF_2024_SOURCE_DOI",
     "PENTACENE_293K",
     "PENTACENE_293K_CROSS_SOURCE_HOLE_HOPPINGS_EV",
     "PENTACENE_293K_CROSS_SOURCE_STATUS",
@@ -32,4 +45,5 @@ __all__ = [
     "pentacene_293k_projected_lattice",
     "pentacene_90k_dewijs_homo_model",
     "pentacene_90k_dewijs_reference_lattice",
+    "pentacene_room_temperature_neef_arpes_homo_model",
 ]
