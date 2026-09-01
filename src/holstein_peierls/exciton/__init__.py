@@ -1,5 +1,11 @@
 """Static electron-hole exciton reference solver."""
 
+from .branches import (
+    DEFAULT_EXCITON_BRANCHES,
+    ExcitonBranchOutcome,
+    ExcitonBranchScan,
+    relax_exciton_branches,
+)
 from .interaction import electron_hole_interaction_matrix
 from .observables import ExcitonObservables, exciton_observables
 from .parameters import ExcitonParameters
@@ -19,6 +25,9 @@ from .solver import (
 )
 
 __all__ = [
+    "DEFAULT_EXCITON_BRANCHES",
+    "ExcitonBranchOutcome",
+    "ExcitonBranchScan",
     "ExcitonEnergy",
     "ExcitonGroundState",
     "ExcitonLatticeGradient",
@@ -33,6 +42,7 @@ __all__ = [
     "exciton_observables",
     "initial_lattice_state",
     "initial_wavefunction",
+    "relax_exciton_branches",
     "relax_static_exciton",
     "solve_exciton_ground_state",
 ]
