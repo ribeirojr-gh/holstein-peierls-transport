@@ -1,6 +1,6 @@
 """Benchmark the generic static exciton against the validated polaron reference.
 
-This is a model/control calculation, not a material parameterization.  By default
+This is a model/control calculation, not a material parameterization. By default
 it uses the same generic Holstein-Peierls values that have been used to validate
 the polaron framework, with equal electron/hole one-particle parameters and a
 0.525 eV onsite electron-hole attraction as a numerical control scale.
@@ -26,7 +26,6 @@ from holstein_peierls.polaron import solve_static_polaron
 
 
 def _center_position(nx: int, ny: int) -> int:
-    """Return a deterministic one-based site near the cell center."""
     return (ny // 2) * nx + (nx // 2) + 1
 
 
@@ -63,11 +62,21 @@ def main() -> None:
     parser.add_argument("--onsite-attraction", type=float, default=0.525)
     parser.add_argument("--max-iterations", type=int, default=1600)
     parser.add_argument(
+        "--mode",
+        action="append",
+        choices=DEFAULT_EXCITON_BRANCHES,
+        dest="modes",
+        help="Branch seed to run; repeat to select multiple. Default: all.",
+    )
+    parser.add_argument(
         "--output", type=Path, default=Path("exciton-reference-benchmark.json")
     )
     args = parser.parse_args()
     if args.size < 3:
         raise ValueError("benchmark size must be at least 3")
+    modes = tuple(args.modes) if args.modes else DEFAULT_EXCITON_BRANCHES
+    if len(set(modes)) != len(modes):
+        raise ValueError("selected branch modes must be unique")
 
     polaron_parameters = _reference_polaron_parameters(
         args.size, args.size, args.max_iterations
@@ -86,7 +95,7 @@ def main() -> None:
     polaron_elapsed = perf_counter() - start
 
     outcomes: list[dict[str, object]] = []
-    for mode in DEFAULT_EXCITON_BRANCHES:
+    for mode in modes:
         branch_start = perf_counter()
         result = relax_static_exciton(exciton_parameters, initialization=mode)
         elapsed = perf_counter() - branch_start
@@ -136,6 +145,7 @@ def main() -> None:
     payload = {
         "model_status": "generic_reference_control_not_material_fit",
         "size": [args.size, args.size],
+        "requested_modes": list(modes),
         "parameters": {
             "j0x_eV": polaron_parameters.j0x,
             "j0y_eV": polaron_parameters.j0y,
