@@ -14,6 +14,7 @@ from pathlib import Path
 from time import perf_counter
 
 from holstein_peierls.exciton import (
+    DEFAULT_BRANCH_ENERGY_TIE_TOLERANCE_EV,
     DEFAULT_EXCITON_BRANCHES,
     ExcitonParameters,
     binding_energy,
@@ -123,7 +124,14 @@ def main() -> None:
     converged = [item for item in outcomes if bool(item["converged"])]
     if not converged:
         raise RuntimeError("no exciton branch converged in the reference benchmark")
-    best = min(converged, key=lambda item: float(item["total_energy_eV"]))
+    minimum_energy = min(float(item["total_energy_eV"]) for item in converged)
+    degenerate = [
+        item
+        for item in converged
+        if float(item["total_energy_eV"]) - minimum_energy
+        <= DEFAULT_BRANCH_ENERGY_TIE_TOLERANCE_EV
+    ]
+    best = degenerate[0]
 
     payload = {
         "model_status": "generic_reference_control_not_material_fit",
@@ -149,13 +157,19 @@ def main() -> None:
             "elapsed_seconds": polaron_elapsed,
         },
         "dissociation_reference_eV": 2.0 * polaron.total_energy,
+        "branch_energy_tie_tolerance_eV": DEFAULT_BRANCH_ENERGY_TIE_TOLERANCE_EV,
         "branches": outcomes,
-        "best_branch": best["mode"],
+        "canonical_best_seed": best["mode"],
+        "degenerate_best_seeds": [item["mode"] for item in degenerate],
         "best_total_energy_eV": best["total_energy_eV"],
         "best_binding_energy_eV": best["binding_energy_eV"],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    print(
+        "canonical best seed="
+        f"{best['mode']} degenerate seeds={[item['mode'] for item in degenerate]}"
+    )
     print(f"wrote {args.output}")
 
 
