@@ -164,8 +164,8 @@ def _run_multiplicity(
         np.asarray(initial_orbitals, dtype=np.float64),
         shell_sizes,
         definition,
-        gradient_tolerance=1.0e-9,
-        max_iterations=600,
+        gradient_tolerance=1.0e-8,
+        max_iterations=800,
     )
     optimization_elapsed = perf_counter() - optimization_start
     if not optimized.diagnostics.converged:
@@ -339,8 +339,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--size", type=int, default=4)
     parser.add_argument("--staggered-gap", type=float, default=2.0)
-    parser.add_argument("--onsite-u", type=float, default=0.8)
-    parser.add_argument("--nearest-neighbor-v", type=float, default=0.2)
+    parser.add_argument("--onsite-u", type=float, default=0.525)
+    parser.add_argument("--nearest-neighbor-v", type=float, default=0.08)
     parser.add_argument("--kick-angle", type=float, default=0.05)
     parser.add_argument("--final-time-fs", type=float, default=0.4)
     parser.add_argument("--dt-values", nargs="+", type=float, default=[0.04, 0.02, 0.01])
