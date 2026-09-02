@@ -15,8 +15,12 @@ for every periodic even-site rectangular cell. That degeneracy makes a
 state-specific HOMO->LUMO Born-Oppenheimer surface non-smooth and is therefore
 a poor validation target. The S0 *benchmark* uses a checkerboard site-energy
 control, ``+gap/2`` and ``-gap/2``, which preserves the x/y square symmetry but
-opens a defined one-particle gap. This staggered term is a numerical validation
-control, not a material parameter and not part of the historical carrier model.
+opens a defined one-particle gap. A diagnostic scan selected 2.0 eV as the
+conservative benchmark default: 1.6 eV already gives a positive excitation but
+does not close both strict structural gates for singlet and triplet, whereas
+2.0 eV does for the tested bond-seeded branches. This staggered term is a
+numerical validation control, not a material parameter and not part of the
+historical carrier model.
 
 The structural optimizer does not reuse the legacy component-wise RPROP step.
 For the neutral-referenced excited-state surface the harmonic lattice Hessian is
@@ -494,7 +498,7 @@ def relax_isotropic_spin_branch(
     orbital_gradient_tolerance: float = 1.0e-8,
     orbital_max_iterations: int = 800,
     gradient_convergence_criterion: float = 1.0e-6,
-    staggered_gap: float = 0.8,
+    staggered_gap: float = 2.0,
 ) -> SpinRelaxationBranchResult:
     """Relax one half-filled singlet/triplet branch from a canonical gapped seed."""
     if parameters.nx != parameters.ny:
