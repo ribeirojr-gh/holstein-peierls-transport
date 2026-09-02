@@ -9,8 +9,9 @@ compared between:
 
 - a tight adaptive DOP853 reference;
 - a looser adaptive DOP853 control;
-- fixed-step RK4; and
-- a structure-preserving predictor exponential midpoint update.
+- fixed-step RK4;
+- a structure-preserving predictor exponential midpoint update; and
+- fourth-order Runge-Kutta-Munthe-Kaas (RKMK4).
 
 No lattice motion, field, thermostat, or post-step projector repair is used.
 """
@@ -34,6 +35,7 @@ from holstein_peierls.dynamics.spin_adapted import (
     projector_constraints,
     projector_energy,
 )
+from holstein_peierls.dynamics.spin_adapted_rkmk import integrate_rkmk4_projectors
 from holstein_peierls.hamiltonian import build_dense_hamiltonian
 from holstein_peierls.lattice import LatticeState
 from holstein_peierls.spin_adapted.excitation_reference import (
@@ -262,6 +264,27 @@ def _run_multiplicity(
             _record(
                 name=f"exp_midpoint_dt{dt_fs:g}",
                 result=midpoint,
+                one_body=one_body,
+                interaction=interaction,
+                initial=initial,
+                reference=reference.projectors,
+                definition=definition,
+                final_time_fs=final_time_fs,
+            )
+        )
+
+        rkmk4 = integrate_rkmk4_projectors(
+            one_body,
+            interaction,
+            initial,
+            definition,
+            dt_fs=dt_fs,
+            steps=steps,
+        )
+        records.append(
+            _record(
+                name=f"rkmk4_dt{dt_fs:g}",
+                result=rkmk4,
                 one_body=one_body,
                 interaction=interaction,
                 initial=initial,
