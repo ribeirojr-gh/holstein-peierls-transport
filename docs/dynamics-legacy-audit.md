@@ -242,3 +242,57 @@ No method should be promoted because of formal order alone. The selection metric
 The new dynamics layer should expose a propagator interface independent of the lattice integrator and thermostat. This allows electronic propagation, classical integration, temperature control, and diagnostics to be changed and benchmarked independently.
 
 This separation is essential for later CPU threading and GPU acceleration: the dominant primitive should become a batched/matrix-free Hamiltonian action rather than a dense eigendecomposition.
+
+## Post-audit revision: occupation, yield, and spin-adapted excitons
+
+The subsequent review of the supplied occupation/yield and Miranda MCTDHF papers
+adds mandatory prerequisites before production exciton dynamics.  The detailed
+design is recorded in `docs/spin-adapted-exciton-observables-design.md`.
+
+The legacy `COEF` occupation calculation is no longer an acceptable definition.
+Modern adiabatic level occupations must be computed from the propagated one-body
+reduced density matrix,
+
+`n_l(t) = <phi_l(t)|gamma1(t)|phi_l(t)>`,
+
+which reduces to the standard sum of squared projections for a Slater
+determinant and to the shell-weighted expression for the fixed-coefficient
+spin-adapted MCTDHF state.
+
+Reaction/exciton yield is a separate observable.  It is defined as a state or
+channel projection,
+
+`Y_C(t) = <Psi(t)|P_C(t)|Psi(t)>`,
+
+with determinant overlaps, multiconfigurational amplitudes, and orthogonality
+handled explicitly.  Occupation numbers must not be used as a substitute for
+channel yields.
+
+The validated static distinguishable electron-hole solver remains a spin-blind
+direct-interaction reference: it intentionally contains no exchange term and
+therefore cannot produce a physical singlet-triplet splitting.  Production
+singlet/triplet calculations require a spin-adapted electronic backend.  The
+first target is the minimal fixed-coefficient open-shell MCTDHF formulation of
+Miranda et al.; it must be implemented as a separate backend rather than by
+silently relabeling the existing pair wavefunction.
+
+Accordingly, the operational validation sequence is now
+
+`S0 -> O0 -> D0a -> D0b -> D1 -> D2 -> D3 -> D4 -> D5 -> D6`,
+
+where:
+
+- `S0` builds and validates the **static spin-adapted** closed-shell,
+  open-shell-singlet, and high-spin-triplet sectors, including exchange,
+  `<S^2>`, singlet-triplet splitting, force finite differences, and tiny-system
+  exact/CI controls;
+- `O0` implements and validates the reduced-density-matrix occupation API and
+  state/channel yield projectors;
+- `D0a` is the original linear frozen-H benchmark (exact exponential, RK4,
+  RK8, Krylov, commutator-free Magnus, and optional controls); and
+- `D0b` separately benchmarks the nonlinear/state-dependent spin-adapted
+  orbital equations.  The eighth-order adaptive Dormand-Prince method used in
+  the Miranda work becomes an explicit high-accuracy reference for this layer.
+
+The old `D0-D6` text above remains the historical audit trail.  This revision is
+the authoritative implementation order for new work.
