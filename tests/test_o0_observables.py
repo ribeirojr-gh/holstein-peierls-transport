@@ -1,6 +1,6 @@
 import numpy as np
 
-from holstein_peierls.observables import (
+from holstein_peierls.projection_observables import (
     channel_yield,
     configuration_expansion_overlap,
     configuration_expansion_norm,
