@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "holstein-peierls-transport"
-version = "0.6.0a1"
-description = "Validated static one-polaron and correlated static two-particle Holstein-Peierls solvers with shell-resolved short-range and screened long-range Coulomb interactions."
+version = "0.7.0a1"
+description = "Validated static Holstein-Peierls solvers for polarons, correlated bipolarons, and distinguishable electron-hole excitons with screened interactions and shared-lattice relaxation."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
