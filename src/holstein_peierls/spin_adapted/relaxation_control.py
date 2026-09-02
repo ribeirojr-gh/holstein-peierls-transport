@@ -14,12 +14,13 @@ The x- and y-bond seeds are related by the square-lattice symmetry and are used
 as an important regression: after relaxation their energies must agree within
 numerical tolerance if both converge to symmetry-equivalent minima.
 
-The S0 relaxation loop deliberately performs only one neutral+excited electronic
-optimization per lattice macro-iteration. The electronic state at the current
-geometry supplies the current Hellmann-Feynman gradient; after an RPROP update,
-that geometry is solved on the next macro-iteration with warm-started orbitals.
-This avoids the historical two-electronic-solves-per-update pattern while
-preserving strict convergence checks on the final geometry.
+The S0 relaxation loop deliberately performs only one normal neutral+excited
+electronic optimization per lattice macro-iteration. The current electronic
+state supplies the Hellmann-Feynman gradient; after an RPROP update, the next
+geometry is solved with warm-started orbitals. If a warm start fails its strict
+orbital-gradient gate, deterministic cold/reseeded recovery attempts are made
+at the same geometry before any nuclear coordinate is moved. This makes the
+structural path robust without ever using unconverged electronic forces.
 """
 
 from __future__ import annotations
@@ -60,13 +61,7 @@ class SpinRelaxationBranchResult:
 
 
 def half_filled_n_closed(n_sites: int) -> int:
-    """Return ``n_closed`` for one neutral HOMO->LUMO excitation at half filling.
-
-    The neutral reference has one pi electron per site. For an even number of
-    sites this gives ``N/2`` doubly occupied spatial orbitals. The excited
-    state keeps the lower ``N/2-1`` orbitals closed and places two electrons in
-    the two frontier orbitals, spin coupled as either a singlet or triplet.
-    """
+    """Return ``n_closed`` for one neutral HOMO->LUMO excitation at half filling."""
     if n_sites < 2:
         raise ValueError("at least two sites are required")
     if n_sites % 2 != 0:
@@ -96,26 +91,20 @@ def isotropic_relaxation_seed(
     cx = parameters.nx // 2
 
     if seed_kind is IsotropicRelaxationSeed.ONSITE:
-        # A local compression is compensated over the four nearest neighbours.
-        # The zero mean avoids adding a physically irrelevant uniform Holstein
-        # displacement to a neutral excitation whose Delta-gamma has zero trace.
         u[cy, cx] = -amplitude
-        neighbours = (
+        neighbours = {
             (cy, (cx + 1) % parameters.nx),
             (cy, (cx - 1) % parameters.nx),
             ((cy + 1) % parameters.ny, cx),
             ((cy - 1) % parameters.ny, cx),
-        )
-        unique_neighbours = sorted(set(neighbours))
-        share = amplitude / len(unique_neighbours)
-        for y, x in unique_neighbours:
+        }
+        share = amplitude / len(neighbours)
+        for y, x in neighbours:
             u[y, x] += share
     elif seed_kind is IsotropicRelaxationSeed.BOND_X:
-        # Strengthen one +x bond without introducing a net rigid translation.
         vx[cy, cx] = +0.5 * amplitude
         vx[cy, (cx + 1) % parameters.nx] = -0.5 * amplitude
     else:
-        # The exact 90-degree partner of BOND_X in the isotropic square control.
         vy[cy, cx] = +0.5 * amplitude
         vy[(cy + 1) % parameters.ny, cx] = -0.5 * amplitude
 
@@ -149,6 +138,116 @@ def _rprop_coordinate_update(
     return delta
 
 
+def _combine_best_electronic_results(
+    states: list[ReferencedExcitationState],
+) -> ReferencedExcitationState:
+    """Combine the best independently optimized neutral/excited states.
+
+    Neutral and excited variational problems are independent at a fixed lattice.
+    Recovery attempts can therefore contribute their best converged component
+    separately. If no attempt converged for a component, the smallest residual
+    orbital gradient is retained so failure remains visible in diagnostics.
+    """
+    first = states[0]
+
+    neutral_converged = [s.neutral for s in states if s.neutral.diagnostics.converged]
+    if neutral_converged:
+        neutral = min(neutral_converged, key=lambda result: result.energy)
+    else:
+        neutral = min(
+            (s.neutral for s in states),
+            key=lambda result: result.diagnostics.final_max_gradient,
+        )
+
+    excited_converged = [s.excited for s in states if s.excited.diagnostics.converged]
+    if excited_converged:
+        excited = min(excited_converged, key=lambda result: result.energy)
+    else:
+        excited = min(
+            (s.excited for s in states),
+            key=lambda result: result.diagnostics.final_max_gradient,
+        )
+
+    return ReferencedExcitationState(
+        neutral=neutral,
+        excited=excited,
+        multiplicity=first.multiplicity,
+        neutral_shell_sizes=first.neutral_shell_sizes,
+        excited_shell_sizes=first.excited_shell_sizes,
+    )
+
+
+def _solve_electronic_with_recovery(
+    lattice: LatticeState,
+    parameters: StaticPolaronParameters,
+    interaction: np.ndarray,
+    *,
+    n_closed: int,
+    multiplicity: SpinMultiplicity,
+    neutral_orbitals: np.ndarray | None,
+    excited_orbitals: np.ndarray | None,
+    orbital_gradient_tolerance: float,
+    orbital_max_iterations: int,
+) -> ReferencedExcitationState:
+    """Solve one geometry, recovering deterministically from a bad warm start."""
+    attempts: list[ReferencedExcitationState] = []
+    primary = solve_referenced_excitation(
+        lattice,
+        parameters,
+        interaction,
+        n_closed=n_closed,
+        multiplicity=multiplicity,
+        initial_neutral_orbitals=neutral_orbitals,
+        initial_excited_orbitals=excited_orbitals,
+        orbital_gradient_tolerance=orbital_gradient_tolerance,
+        orbital_max_iterations=orbital_max_iterations,
+    )
+    attempts.append(primary)
+    if primary.neutral.diagnostics.converged and primary.excited.diagnostics.converged:
+        return primary
+
+    # First recovery: rebuild the neutral state canonically and seed the excited
+    # optimization from the best available neutral frame. The larger iteration
+    # budget is paid only after a failed primary warm start.
+    excited_seed = (
+        primary.neutral.orbitals
+        if primary.neutral.diagnostics.converged
+        else None
+    )
+    recovery = solve_referenced_excitation(
+        lattice,
+        parameters,
+        interaction,
+        n_closed=n_closed,
+        multiplicity=multiplicity,
+        initial_neutral_orbitals=None,
+        initial_excited_orbitals=excited_seed,
+        orbital_gradient_tolerance=orbital_gradient_tolerance,
+        orbital_max_iterations=max(2 * orbital_max_iterations, orbital_max_iterations + 200),
+    )
+    attempts.append(recovery)
+    combined = _combine_best_electronic_results(attempts)
+    if combined.neutral.diagnostics.converged and combined.excited.diagnostics.converged:
+        return combined
+
+    # Final recovery: both sectors start from the canonical one-body basis.
+    # This is deliberately expensive but deterministic and only reached if both
+    # previous representations failed the strict variational gate.
+    cold = solve_referenced_excitation(
+        lattice,
+        parameters,
+        interaction,
+        n_closed=n_closed,
+        multiplicity=multiplicity,
+        initial_neutral_orbitals=None,
+        initial_excited_orbitals=None,
+        orbital_gradient_tolerance=orbital_gradient_tolerance,
+        orbital_max_iterations=max(4 * orbital_max_iterations, orbital_max_iterations + 500),
+    )
+    attempts.append(cold)
+    return _combine_best_electronic_results(attempts)
+
+
 def _single_solve_relaxation(
     parameters: StaticPolaronParameters,
     interaction: np.ndarray,
@@ -160,7 +259,7 @@ def _single_solve_relaxation(
     orbital_max_iterations: int,
     gradient_convergence_criterion: float,
 ) -> StaticReferencedExcitationResult:
-    """Relax lattice and orbitals with one electronic solve per macro-iteration."""
+    """Relax lattice and orbitals with one normal electronic solve per macro-step."""
     lattice = initial_lattice.copy()
     previous_u = np.zeros_like(lattice.u)
     previous_vx = np.zeros_like(lattice.vx)
@@ -178,14 +277,14 @@ def _single_solve_relaxation(
     iteration = 0
 
     for iteration in range(1, parameters.max_iterations + 1):
-        current = solve_referenced_excitation(
+        current = _solve_electronic_with_recovery(
             lattice,
             parameters,
             interaction,
             n_closed=n_closed,
             multiplicity=multiplicity,
-            initial_neutral_orbitals=neutral_orbitals,
-            initial_excited_orbitals=excited_orbitals,
+            neutral_orbitals=neutral_orbitals,
+            excited_orbitals=excited_orbitals,
             orbital_gradient_tolerance=orbital_gradient_tolerance,
             orbital_max_iterations=orbital_max_iterations,
         )
@@ -204,9 +303,6 @@ def _single_solve_relaxation(
             converged = True
             break
 
-        # Never move the nuclei using a state that has not satisfied the
-        # electronic variational criterion.  The failure remains visible in
-        # the returned diagnostics instead of contaminating structural forces.
         if not (neutral_ok and excited_ok):
             break
 
@@ -232,18 +328,15 @@ def _single_solve_relaxation(
 
     assert current is not None
 
-    # If the loop ended immediately after a lattice update (for example by
-    # reaching max_iterations), solve the final geometry exactly once so every
-    # returned energy and gradient corresponds to the returned coordinates.
     if not state_matches_lattice:
-        current = solve_referenced_excitation(
+        current = _solve_electronic_with_recovery(
             lattice,
             parameters,
             interaction,
             n_closed=n_closed,
             multiplicity=multiplicity,
-            initial_neutral_orbitals=neutral_orbitals,
-            initial_excited_orbitals=excited_orbitals,
+            neutral_orbitals=neutral_orbitals,
+            excited_orbitals=excited_orbitals,
             orbital_gradient_tolerance=orbital_gradient_tolerance,
             orbital_max_iterations=orbital_max_iterations,
         )
