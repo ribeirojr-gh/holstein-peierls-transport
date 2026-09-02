@@ -44,6 +44,10 @@ from .spin_adapted import (
     validate_projector_manifold,
     variational_generator,
 )
+from .spin_adapted_rkmk import (
+    integrate_rkmk4_projectors,
+    rkmk4_projector_step,
+)
 
 __all__ = [
     "HBAR_EV_FS",
@@ -65,6 +69,7 @@ __all__ = [
     "integrate_dop853_projectors",
     "integrate_predictor_exponential_midpoint",
     "integrate_rk4_projectors",
+    "integrate_rkmk4_projectors",
     "lanczos_exponential_step",
     "predictor_exponential_midpoint_step",
     "projector_constraints",
@@ -74,6 +79,7 @@ __all__ = [
     "rk4_projector_step",
     "rk4_step",
     "rkf78_step",
+    "rkmk4_projector_step",
     "spin_summed_rdm",
     "validate_projector_manifold",
     "variational_generator",
