@@ -9,9 +9,12 @@ with the historical K1/K2 values and a simple density-density validation
 interaction. The neutral pi system is half filled. Because the periodic
 nearest-neighbour square lattice is exactly gapless at half filling, the
 benchmark also uses a checkerboard site-energy term with a configurable full
-one-particle gap (default 0.8 eV). The staggered gap is a validation control,
-not material data. Multiple small structural seeds detect symmetry-related or
-metastable minima rather than supplying physical material information.
+one-particle gap (default 2.0 eV). A diagnostic scan established 2.0 eV as the
+first tested conservative value for which both bond-seeded singlet and triplet
+branches satisfy the strict electronic and structural convergence gates. The
+staggered gap is a validation control, not material data. Multiple small
+structural seeds detect symmetry-related or metastable minima rather than
+supplying physical material information.
 """
 
 from __future__ import annotations
@@ -37,7 +40,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--size", type=int, default=4)
     parser.add_argument("--onsite-u", type=float, default=0.525)
     parser.add_argument("--nearest-v", type=float, default=0.08)
-    parser.add_argument("--staggered-gap", type=float, default=0.8)
+    parser.add_argument("--staggered-gap", type=float, default=2.0)
     parser.add_argument("--seed-amplitude", type=float, default=1.0e-3)
     parser.add_argument("--orbital-tolerance", type=float, default=1.0e-8)
     parser.add_argument("--orbital-max-iterations", type=int, default=800)
