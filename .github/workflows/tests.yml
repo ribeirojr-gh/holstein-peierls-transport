@@ -30,6 +30,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install package
+        run: python -m pip install -e '.[dev]'
       - name: Run 4x4 S0 relaxation branch
         run: |
           mkdir -p benchmark
