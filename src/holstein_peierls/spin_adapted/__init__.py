@@ -44,6 +44,13 @@ from .pair_control import (
     singlet_triplet_gap,
     solve_spin_adapted_pair,
 )
+from .relaxation_control import (
+    IsotropicRelaxationSeed,
+    SpinRelaxationBranchResult,
+    half_filled_n_closed,
+    isotropic_relaxation_seed,
+    relax_isotropic_spin_branch,
+)
 from .spin import SpinMultiplicity, minimal_open_shell_coefficients, s2_eigenvalue
 
 __all__ = [
@@ -52,6 +59,7 @@ __all__ = [
     "HIGH_SPIN_TRIPLET",
     "OPEN_SHELL_SINGLET",
     "IsotropicControlParameters",
+    "IsotropicRelaxationSeed",
     "OpenShellOrbitalResult",
     "OpenShellStateDefinition",
     "OrbitalOptimizationDiagnostics",
@@ -59,11 +67,14 @@ __all__ = [
     "ReferencedExcitationState",
     "SpinAdaptedPairState",
     "SpinMultiplicity",
+    "SpinRelaxationBranchResult",
     "StaticReferencedExcitationResult",
     "StaticSpinAdaptedPairResult",
     "density_density_control_interaction",
     "exchange_control_matrix",
     "general_open_shell_energy",
+    "half_filled_n_closed",
+    "isotropic_relaxation_seed",
     "minimal_open_shell_coefficients",
     "open_shell_orbital_energy",
     "optimize_open_shell_orbitals",
@@ -71,6 +82,7 @@ __all__ = [
     "reference_shell_sizes",
     "referenced_excitation_energy",
     "referenced_excitation_gradient",
+    "relax_isotropic_spin_branch",
     "relax_referenced_excitation",
     "relax_spin_adapted_pair",
     "s2_eigenvalue",
