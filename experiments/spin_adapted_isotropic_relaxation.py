@@ -54,6 +54,11 @@ def _parser() -> argparse.ArgumentParser:
         default="all",
     )
     parser.add_argument("--output", type=Path, default=None)
+    parser.add_argument(
+        "--require-converged",
+        action="store_true",
+        help="exit nonzero after writing output if any selected branch is unconverged",
+    )
     return parser
 
 
@@ -188,6 +193,9 @@ def main() -> None:
     print(text)
     if args.output is not None:
         args.output.write_text(text + "\n", encoding="utf-8")
+
+    if args.require_converged and not all(bool(item["converged"]) for item in summaries):
+        raise SystemExit("one or more selected S0 relaxation branches did not converge")
 
 
 if __name__ == "__main__":
