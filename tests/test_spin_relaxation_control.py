@@ -3,12 +3,15 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from holstein_peierls.hamiltonian import build_dense_hamiltonian
+from holstein_peierls.lattice import LatticeState
 from holstein_peierls.spin_adapted import (
     IsotropicControlParameters,
     IsotropicRelaxationSeed,
     half_filled_n_closed,
     harmonic_lattice_newton_direction,
     isotropic_relaxation_seed,
+    isotropic_staggered_site_energies,
 )
 
 
@@ -49,6 +52,33 @@ def test_x_and_y_bond_seeds_are_exact_isotropic_partners() -> None:
     )
     assert np.isclose(np.sum(x_seed.vx), 0.0, atol=1.0e-15)
     assert np.isclose(np.sum(y_seed.vy), 0.0, atol=1.0e-15)
+
+
+def test_checkerboard_control_opens_the_requested_half_filled_gap() -> None:
+    parameters = IsotropicControlParameters().to_polaron_parameters(nx=4, ny=4)
+    requested_gap = 0.8
+    site_energy = isotropic_staggered_site_energies(parameters, requested_gap)
+
+    assert set(np.unique(site_energy)) == {-0.4, 0.4}
+    np.testing.assert_allclose(site_energy, site_energy.T, atol=0.0)
+
+    electronic_lattice = LatticeState(
+        u=site_energy / parameters.alpha_intra,
+        vx=np.zeros((parameters.ny, parameters.nx)),
+        vy=np.zeros((parameters.ny, parameters.nx)),
+    )
+    eigenvalues = np.linalg.eigvalsh(
+        build_dense_hamiltonian(electronic_lattice, parameters)
+    )
+    half = parameters.n_sites // 2
+    numerical_gap = eigenvalues[half] - eigenvalues[half - 1]
+    assert numerical_gap == pytest.approx(requested_gap, abs=2.0e-12)
+
+
+def test_checkerboard_control_rejects_incompatible_periodic_cells() -> None:
+    parameters = IsotropicControlParameters().to_polaron_parameters(nx=5, ny=4)
+    with pytest.raises(ValueError, match="even nx and ny"):
+        isotropic_staggered_site_energies(parameters, 0.8)
 
 
 def test_harmonic_newton_direction_inverts_the_lattice_hessian() -> None:
