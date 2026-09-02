@@ -39,8 +39,10 @@ jobs:
             --size 4 \
             --multiplicity '${{ matrix.multiplicity }}' \
             --seed '${{ matrix.seed }}' \
+            --require-converged \
             --output 'benchmark/${{ matrix.multiplicity }}-${{ matrix.seed }}.json'
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: s0-${{ matrix.multiplicity }}-${{ matrix.seed }}
           path: benchmark/*.json
