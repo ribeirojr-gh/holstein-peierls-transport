@@ -6,6 +6,11 @@ thermostats, fields, and nonlinear spin-adapted orbital dynamics remain outside
 this package until their dedicated validation stages.
 """
 
+from .benchmark import (
+    FrozenBenchmarkRecord,
+    FrozenBenchmarkSuite,
+    benchmark_frozen_hamiltonian,
+)
 from .frozen import (
     HBAR_EV_FS,
     CountingMatrixHamiltonian,
@@ -24,8 +29,11 @@ from .frozen import (
 __all__ = [
     "HBAR_EV_FS",
     "CountingMatrixHamiltonian",
+    "FrozenBenchmarkRecord",
+    "FrozenBenchmarkSuite",
     "PropagationMetrics",
     "PropagationStep",
+    "benchmark_frozen_hamiltonian",
     "cfm4_frozen_limit_step",
     "compare_to_reference",
     "crank_nicolson_step",
