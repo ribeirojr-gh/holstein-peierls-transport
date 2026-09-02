@@ -430,7 +430,7 @@ def compare_to_reference(
     reference_norm = float(np.linalg.norm(reference))
     candidate_norm = float(np.linalg.norm(candidate))
     normalized_overlap = np.vdot(reference, candidate) / (reference_norm * candidate_norm)
-    fidelity = float(abs(normalized_overlap) ** 2)
+    fidelity = float(np.clip(abs(normalized_overlap) ** 2, 0.0, 1.0))
     overlap = np.vdot(reference, candidate)
     if abs(overlap) > 0.0:
         phase = np.conj(overlap) / abs(overlap)
