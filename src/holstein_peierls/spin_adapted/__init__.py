@@ -50,6 +50,7 @@ from .relaxation_control import (
     half_filled_n_closed,
     harmonic_lattice_newton_direction,
     isotropic_relaxation_seed,
+    isotropic_staggered_site_energies,
     relax_isotropic_spin_branch,
 )
 from .spin import SpinMultiplicity, minimal_open_shell_coefficients, s2_eigenvalue
@@ -77,6 +78,7 @@ __all__ = [
     "half_filled_n_closed",
     "harmonic_lattice_newton_direction",
     "isotropic_relaxation_seed",
+    "isotropic_staggered_site_energies",
     "minimal_open_shell_coefficients",
     "open_shell_orbital_energy",
     "optimize_open_shell_orbitals",
