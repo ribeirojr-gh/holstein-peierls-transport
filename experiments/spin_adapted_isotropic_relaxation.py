@@ -40,6 +40,16 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--orbital-max-iterations", type=int, default=800)
     parser.add_argument("--lattice-max-iterations", type=int, default=1200)
     parser.add_argument("--gradient-tolerance", type=float, default=1.0e-6)
+    parser.add_argument(
+        "--multiplicity",
+        choices=("all", "singlet", "triplet"),
+        default="all",
+    )
+    parser.add_argument(
+        "--seed",
+        choices=("all",) + tuple(seed.value for seed in IsotropicRelaxationSeed),
+        default="all",
+    )
     parser.add_argument("--output", type=Path, default=None)
     return parser
 
@@ -75,6 +85,18 @@ def _branch_summary(branch) -> dict[str, object]:
     }
 
 
+def _selected_multiplicities(name: str) -> tuple[SpinMultiplicity, ...]:
+    if name == "all":
+        return (SpinMultiplicity.SINGLET, SpinMultiplicity.TRIPLET)
+    return (SpinMultiplicity(name),)
+
+
+def _selected_seeds(name: str) -> tuple[IsotropicRelaxationSeed, ...]:
+    if name == "all":
+        return tuple(IsotropicRelaxationSeed)
+    return (IsotropicRelaxationSeed(name),)
+
+
 def main() -> None:
     args = _parser().parse_args()
     if args.size % 2 != 0:
@@ -93,8 +115,8 @@ def main() -> None:
     )
 
     summaries: list[dict[str, object]] = []
-    for multiplicity in (SpinMultiplicity.SINGLET, SpinMultiplicity.TRIPLET):
-        for seed in IsotropicRelaxationSeed:
+    for multiplicity in _selected_multiplicities(args.multiplicity):
+        for seed in _selected_seeds(args.seed):
             branch = relax_isotropic_spin_branch(
                 parameters,
                 interaction,
