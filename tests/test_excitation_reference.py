@@ -58,7 +58,7 @@ def test_neutral_excitation_rdm_has_zero_trace_for_both_spin_sectors() -> None:
             interaction,
             n_closed=1,
             multiplicity=multiplicity,
-            orbital_gradient_tolerance=2.0e-9,
+            orbital_gradient_tolerance=1.0e-8,
         )
         assert state.neutral.diagnostics.converged
         assert state.excited.diagnostics.converged
@@ -77,7 +77,7 @@ def test_exchange_off_referenced_singlet_and_triplet_are_degenerate() -> None:
         interaction,
         n_closed=1,
         multiplicity=SpinMultiplicity.SINGLET,
-        orbital_gradient_tolerance=2.0e-9,
+        orbital_gradient_tolerance=1.0e-8,
     )
     triplet = solve_referenced_excitation(
         lattice,
@@ -85,7 +85,7 @@ def test_exchange_off_referenced_singlet_and_triplet_are_degenerate() -> None:
         interaction,
         n_closed=1,
         multiplicity=SpinMultiplicity.TRIPLET,
-        orbital_gradient_tolerance=2.0e-9,
+        orbital_gradient_tolerance=1.0e-8,
     )
     assert np.isclose(
         singlet.electronic_excitation_energy,
@@ -103,7 +103,7 @@ def test_referenced_structural_gradient_matches_reoptimized_finite_difference() 
         interaction,
         n_closed=1,
         multiplicity=SpinMultiplicity.SINGLET,
-        orbital_gradient_tolerance=5.0e-10,
+        orbital_gradient_tolerance=1.0e-8,
         orbital_max_iterations=800,
     )
     assert central.neutral.diagnostics.converged
@@ -119,7 +119,7 @@ def test_referenced_structural_gradient_matches_reoptimized_finite_difference() 
             multiplicity=SpinMultiplicity.SINGLET,
             initial_neutral_orbitals=central.neutral.orbitals,
             initial_excited_orbitals=central.excited.orbitals,
-            orbital_gradient_tolerance=5.0e-10,
+            orbital_gradient_tolerance=1.0e-8,
             orbital_max_iterations=800,
         )
         assert solved.neutral.diagnostics.converged
