@@ -14,13 +14,21 @@ The x- and y-bond seeds are related by the square-lattice symmetry and are used
 as an important regression: after relaxation their energies must agree within
 numerical tolerance if both converge to symmetry-equivalent minima.
 
-The S0 relaxation loop deliberately performs only one normal neutral+excited
-electronic optimization per lattice macro-iteration. The current electronic
-state supplies the Hellmann-Feynman gradient; after an RPROP update, the next
-geometry is solved with warm-started orbitals. If a warm start fails its strict
-orbital-gradient gate, deterministic cold/reseeded recovery attempts are made
-at the same geometry before any nuclear coordinate is moved. This makes the
-structural path robust without ever using unconverged electronic forces.
+The structural optimizer does not reuse the legacy component-wise RPROP step.
+For the neutral-referenced excited-state surface the harmonic lattice Hessian is
+known analytically: ``K1 I`` for the intramolecular coordinate and a periodic
+one-dimensional Laplacian with stiffness ``K2`` for each intermolecular row or
+column.  We therefore solve the corresponding Newton/preconditioned-gradient
+direction exactly at fixed electronic state and perform an Armijo line search
+on the fully reoptimized Born-Oppenheimer energy.  The translational zero modes
+of the Peierls coordinates are fixed to zero mean through the Moore-Penrose
+pseudoinverse of the periodic Laplacian.
+
+Each accepted geometry carries an electronically converged neutral and excited
+state. If a warm start fails its strict orbital-gradient gate, deterministic
+cold/reseeded recovery attempts are made at the same geometry before the
+candidate can enter the structural line search. This prevents unconverged
+electronic forces from moving the lattice.
 """
 
 from __future__ import annotations
@@ -111,31 +119,96 @@ def isotropic_relaxation_seed(
     return LatticeState(u=u, vx=vx, vy=vy)
 
 
-def _rprop_coordinate_update(
-    coordinate: np.ndarray,
-    gradient: np.ndarray,
-    previous_gradient: np.ndarray,
-    step_size: np.ndarray,
-    parameters: StaticPolaronParameters,
+def _periodic_laplacian_pseudoinverse(
+    rhs: np.ndarray,
+    *,
+    stiffness: float,
+    axis: int,
 ) -> np.ndarray:
-    """Apply one component-wise RPROP update using the legacy conventions."""
-    product = gradient * previous_gradient
-    positive = product > 0.0
-    negative = product < 0.0
-    step_size[positive] = np.minimum(
-        step_size[positive] * parameters.acceleration_factor,
-        parameters.update_max,
+    """Solve ``stiffness * L x = rhs`` with the periodic zero mode fixed to zero.
+
+    ``L`` is the positive semidefinite nearest-neighbour Laplacian
+    ``2*x_i-x_{i-1}-x_{i+1}``. The right-hand side is projected onto the
+    zero-mean subspace before inversion. This is exactly the Moore-Penrose
+    solution and keeps the physically irrelevant rigid Peierls translation at
+    zero.
+    """
+    values = np.asarray(rhs, dtype=np.float64)
+    if values.ndim != 2:
+        raise ValueError("periodic lattice solve requires a two-dimensional array")
+    if stiffness <= 0.0:
+        raise ValueError("lattice stiffness must be positive")
+    if axis not in (0, 1):
+        raise ValueError("axis must be 0 or 1")
+
+    n = values.shape[axis]
+    projected = values - np.mean(values, axis=axis, keepdims=True)
+    transformed = np.fft.fft(projected, axis=axis)
+    wave = 2.0 * np.pi * np.arange(n, dtype=np.float64) / float(n)
+    eigenvalues = stiffness * (2.0 - 2.0 * np.cos(wave))
+    inverse = np.zeros_like(eigenvalues)
+    nonzero = eigenvalues > 64.0 * np.finfo(np.float64).eps * stiffness
+    inverse[nonzero] = 1.0 / eigenvalues[nonzero]
+
+    shape = [1, 1]
+    shape[axis] = n
+    solution = np.fft.ifft(transformed * inverse.reshape(shape), axis=axis).real
+    return np.asarray(solution, dtype=np.float64)
+
+
+def harmonic_lattice_newton_direction(
+    parameters: StaticPolaronParameters,
+    gradient,
+) -> LatticeState:
+    """Return the exact fixed-electronic-state Newton direction for the lattice.
+
+    The electronic Hellmann-Feynman contribution is linear in the coordinates
+    for the present frozen density-density interaction. Consequently the
+    structural Hessian is just the harmonic lattice Hessian. Peierls zero modes
+    are handled by the periodic Laplacian pseudoinverse.
+    """
+    delta_u = -np.asarray(gradient.u, dtype=np.float64) / parameters.k1
+    delta_vx = _periodic_laplacian_pseudoinverse(
+        -np.asarray(gradient.vx, dtype=np.float64),
+        stiffness=parameters.k2,
+        axis=1,
     )
-    step_size[negative] = np.maximum(
-        step_size[negative] * parameters.deceleration_factor,
-        parameters.update_min,
+    delta_vy = _periodic_laplacian_pseudoinverse(
+        -np.asarray(gradient.vy, dtype=np.float64),
+        stiffness=parameters.k2,
+        axis=0,
     )
-    effective_gradient = gradient.copy()
-    effective_gradient[negative] = 0.0
-    delta = -np.sign(effective_gradient) * step_size
-    coordinate += delta
-    previous_gradient[...] = effective_gradient
-    return delta
+    return LatticeState(u=delta_u, vx=delta_vx, vy=delta_vy)
+
+
+def _maximum_lattice_component(lattice: LatticeState) -> float:
+    return float(
+        max(
+            np.max(np.abs(lattice.u)),
+            np.max(np.abs(lattice.vx)),
+            np.max(np.abs(lattice.vy)),
+        )
+    )
+
+
+def _lattice_inner_product(gradient, direction: LatticeState) -> float:
+    return float(
+        np.sum(np.asarray(gradient.u) * direction.u)
+        + np.sum(np.asarray(gradient.vx) * direction.vx)
+        + np.sum(np.asarray(gradient.vy) * direction.vy)
+    )
+
+
+def _displaced_lattice(
+    lattice: LatticeState,
+    direction: LatticeState,
+    step: float,
+) -> LatticeState:
+    return LatticeState(
+        u=np.asarray(lattice.u + step * direction.u, dtype=np.float64),
+        vx=np.asarray(lattice.vx + step * direction.vx, dtype=np.float64),
+        vy=np.asarray(lattice.vy + step * direction.vy, dtype=np.float64),
+    )
 
 
 def _combine_best_electronic_results(
@@ -206,14 +279,7 @@ def _solve_electronic_with_recovery(
     if primary.neutral.diagnostics.converged and primary.excited.diagnostics.converged:
         return primary
 
-    # First recovery: rebuild the neutral state canonically and seed the excited
-    # optimization from the best available neutral frame. The larger iteration
-    # budget is paid only after a failed primary warm start.
-    excited_seed = (
-        primary.neutral.orbitals
-        if primary.neutral.diagnostics.converged
-        else None
-    )
+    excited_seed = primary.neutral.orbitals if primary.neutral.diagnostics.converged else None
     recovery = solve_referenced_excitation(
         lattice,
         parameters,
@@ -230,9 +296,6 @@ def _solve_electronic_with_recovery(
     if combined.neutral.diagnostics.converged and combined.excited.diagnostics.converged:
         return combined
 
-    # Final recovery: both sectors start from the canonical one-body basis.
-    # This is deliberately expensive but deterministic and only reached if both
-    # previous representations failed the strict variational gate.
     cold = solve_referenced_excitation(
         lattice,
         parameters,
@@ -248,7 +311,7 @@ def _solve_electronic_with_recovery(
     return _combine_best_electronic_results(attempts)
 
 
-def _single_solve_relaxation(
+def _harmonic_preconditioned_relaxation(
     parameters: StaticPolaronParameters,
     interaction: np.ndarray,
     *,
@@ -258,100 +321,109 @@ def _single_solve_relaxation(
     orbital_gradient_tolerance: float,
     orbital_max_iterations: int,
     gradient_convergence_criterion: float,
+    armijo_constant: float = 1.0e-4,
+    line_search_shrink: float = 0.5,
+    minimum_line_search_step: float = 2.0**-24,
 ) -> StaticReferencedExcitationResult:
-    """Relax lattice and orbitals with one normal electronic solve per macro-step."""
-    lattice = initial_lattice.copy()
-    previous_u = np.zeros_like(lattice.u)
-    previous_vx = np.zeros_like(lattice.vx)
-    previous_vy = np.zeros_like(lattice.vy)
-    step_u = np.full_like(lattice.u, parameters.update_start)
-    step_vx = np.full_like(lattice.vx, parameters.update_start)
-    step_vy = np.full_like(lattice.vy, parameters.update_start)
+    """Relax the Born-Oppenheimer surface using the exact harmonic preconditioner."""
+    if not 0.0 < armijo_constant < 1.0:
+        raise ValueError("armijo_constant must lie between zero and one")
+    if not 0.0 < line_search_shrink < 1.0:
+        raise ValueError("line_search_shrink must lie between zero and one")
+    if not 0.0 < minimum_line_search_step < 1.0:
+        raise ValueError("minimum_line_search_step must lie between zero and one")
 
-    neutral_orbitals: np.ndarray | None = None
-    excited_orbitals: np.ndarray | None = None
-    current: ReferencedExcitationState | None = None
+    lattice = initial_lattice.copy()
+    current = _solve_electronic_with_recovery(
+        lattice,
+        parameters,
+        interaction,
+        n_closed=n_closed,
+        multiplicity=multiplicity,
+        neutral_orbitals=None,
+        excited_orbitals=None,
+        orbital_gradient_tolerance=orbital_gradient_tolerance,
+        orbital_max_iterations=orbital_max_iterations,
+    )
     final_update = np.inf
     converged = False
-    state_matches_lattice = False
     iteration = 0
 
     for iteration in range(1, parameters.max_iterations + 1):
-        current = _solve_electronic_with_recovery(
-            lattice,
-            parameters,
-            interaction,
-            n_closed=n_closed,
-            multiplicity=multiplicity,
-            neutral_orbitals=neutral_orbitals,
-            excited_orbitals=excited_orbitals,
-            orbital_gradient_tolerance=orbital_gradient_tolerance,
-            orbital_max_iterations=orbital_max_iterations,
-        )
-        state_matches_lattice = True
         neutral_ok = current.neutral.diagnostics.converged
         excited_ok = current.excited.diagnostics.converged
         gradient = referenced_excitation_gradient(lattice, parameters, current)
         gradient_value = gradient.maximum_absolute_component
 
-        if (
-            neutral_ok
-            and excited_ok
-            and final_update < parameters.convergence_criterion
-            and gradient_value < gradient_convergence_criterion
-        ):
+        if not (neutral_ok and excited_ok):
+            break
+        if gradient_value < gradient_convergence_criterion:
+            final_update = 0.0
             converged = True
             break
 
-        if not (neutral_ok and excited_ok):
+        direction = harmonic_lattice_newton_direction(parameters, gradient)
+        direction_max = _maximum_lattice_component(direction)
+        directional_derivative = _lattice_inner_product(gradient, direction)
+        if (
+            not np.isfinite(directional_derivative)
+            or directional_derivative >= 0.0
+            or not np.isfinite(direction_max)
+            or direction_max == 0.0
+        ):
             break
 
-        delta_u = _rprop_coordinate_update(
-            lattice.u, gradient.u, previous_u, step_u, parameters
-        )
-        delta_vx = _rprop_coordinate_update(
-            lattice.vx, gradient.vx, previous_vx, step_vx, parameters
-        )
-        delta_vy = _rprop_coordinate_update(
-            lattice.vy, gradient.vy, previous_vy, step_vy, parameters
-        )
-        final_update = float(
-            max(
-                np.max(np.abs(delta_u)),
-                np.max(np.abs(delta_vx)),
-                np.max(np.abs(delta_vy)),
+        current_energy = referenced_excitation_energy(lattice, parameters, current)
+        trial_step = 1.0
+        accepted = False
+        while trial_step >= minimum_line_search_step:
+            candidate_lattice = _displaced_lattice(lattice, direction, trial_step)
+            candidate_state = _solve_electronic_with_recovery(
+                candidate_lattice,
+                parameters,
+                interaction,
+                n_closed=n_closed,
+                multiplicity=multiplicity,
+                neutral_orbitals=current.neutral.orbitals,
+                excited_orbitals=current.excited.orbitals,
+                orbital_gradient_tolerance=orbital_gradient_tolerance,
+                orbital_max_iterations=orbital_max_iterations,
             )
-        )
-        neutral_orbitals = current.neutral.orbitals
-        excited_orbitals = current.excited.orbitals
-        state_matches_lattice = False
+            candidate_ok = (
+                candidate_state.neutral.diagnostics.converged
+                and candidate_state.excited.diagnostics.converged
+            )
+            if candidate_ok:
+                candidate_energy = referenced_excitation_energy(
+                    candidate_lattice, parameters, candidate_state
+                )
+                armijo_bound = (
+                    current_energy.total
+                    + armijo_constant * trial_step * directional_derivative
+                )
+                if candidate_energy.total <= armijo_bound:
+                    lattice = candidate_lattice
+                    current = candidate_state
+                    final_update = trial_step * direction_max
+                    accepted = True
+                    break
+            trial_step *= line_search_shrink
 
-    assert current is not None
-
-    if not state_matches_lattice:
-        current = _solve_electronic_with_recovery(
-            lattice,
-            parameters,
-            interaction,
-            n_closed=n_closed,
-            multiplicity=multiplicity,
-            neutral_orbitals=neutral_orbitals,
-            excited_orbitals=excited_orbitals,
-            orbital_gradient_tolerance=orbital_gradient_tolerance,
-            orbital_max_iterations=orbital_max_iterations,
-        )
+        if not accepted:
+            break
 
     final_energy = referenced_excitation_energy(lattice, parameters, current)
     final_gradient = referenced_excitation_gradient(lattice, parameters, current)
     final_gradient_value = final_gradient.maximum_absolute_component
     neutral_ok = current.neutral.diagnostics.converged
     excited_ok = current.excited.diagnostics.converged
-    converged = converged or (
+    if (
         neutral_ok
         and excited_ok
-        and final_update < parameters.convergence_criterion
         and final_gradient_value < gradient_convergence_criterion
-    )
+    ):
+        final_update = 0.0
+        converged = True
 
     return StaticReferencedExcitationResult(
         lattice=lattice,
@@ -394,7 +466,7 @@ def relax_isotropic_spin_branch(
         seed_kind,
         amplitude=seed_amplitude,
     )
-    result = _single_solve_relaxation(
+    result = _harmonic_preconditioned_relaxation(
         parameters,
         interaction,
         n_closed=half_filled_n_closed(parameters.n_sites),
