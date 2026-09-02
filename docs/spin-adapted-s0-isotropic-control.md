@@ -2,9 +2,9 @@
 
 ## Scope decision
 
-The spin-adapted implementation will be developed first in the smallest
-parameter space possible.  The legacy/reference Holstein-Peierls parameter
-naming is mapped to the research notation as follows:
+The spin-adapted implementation is developed first in the smallest parameter
+space possible.  The legacy/reference Holstein-Peierls parameter naming is
+mapped to the research notation as follows:
 
 - `J1 -> j0x`;
 - `J2 -> j0y`;
@@ -35,12 +35,12 @@ The existing `exciton` package is a distinguishable electron-hole pair model.
 It is useful for direct Coulomb binding and for matrix-free numerical tests, but
 its electronic Hilbert space does not by itself contain the open-shell
 many-electron exchange structure required by the Miranda MCTDHF formalism.
-Therefore S0 is being built in two complementary pieces rather than by silently
+Therefore S0 is built in two complementary pieces rather than by silently
 adding a `singlet`/`triplet` label to the old solver.
 
 ### S0a: general open-shell functional
 
-The new `spin_adapted.open_shell` module implements the stationary energy and
+The `spin_adapted.open_shell` module implements the stationary energy and
 shell-Fock functional corresponding to the general open-shell equations used by
 Miranda et al. for a site-basis density-density interaction kernel.
 
@@ -53,16 +53,33 @@ The following state definitions are encoded explicitly:
 3. high-spin triplet: occupations `(2,1)` with
    `a=[[1,1],[1,1]]` and `b=[[1,1],[1,2]]`.
 
-This is the physical core that will be used by the orbital optimizer and later
-by the MCTDHF orbital generator.
+The validation gates now include:
 
-The first exact algebra controls are already defined:
+- noninteracting singlet/triplet degeneracy;
+- `<S^2>=0` for the singlet and `<S^2>=2` for the triplet;
+- reduction of the closed-shell Fock matrix to `T + 2J - K`;
+- an exchange-driven Hubbard-dimer singlet-triplet splitting;
+- direct comparison of both the open-shell singlet and high-spin triplet
+  energies with an independently constructed fixed-particle Fock-space
+  Hamiltonian on a tiny system.
 
-- the noninteracting singlet/triplet limit is degenerate;
-- the expected `<S^2>` values are `0` and `2`;
-- the closed-shell Fock matrix reduces to `T + 2J - K`;
-- a two-site Hubbard open-shell control gives the expected exchange-driven
-  singlet-triplet splitting.
+### State-specific orbital optimization
+
+`spin_adapted.orbital_optimization` now provides the first stationary orbital
+optimizer.  It uses a complete orthonormal orbital matrix and exponential
+orbital rotations.  The analytic anti-symmetric gradient is
+
+`M = sum_mu n_mu [P_mu, F_mu]`.
+
+Only rotations between orbital subspaces with different occupation numbers are
+allowed.  Rotations within one shell are gauge degrees of freedom.  Rotations
+between the two different singly occupied singlet shells are also held fixed,
+consistent with the minimal fixed-coefficient Miranda variational restriction.
+
+The analytic orbital-rotation derivative has been checked against central
+finite differences.  Closed-shell optimization decreases the energy while
+preserving orthonormality, and the interaction-free optimized singlet and
+triplet controls remain degenerate.
 
 ### S0b-control: reduced electron-hole exchange bridge
 
@@ -71,13 +88,12 @@ exchange kernel to the validated distinguishable pair Hamiltonian.  This is
 **not** the production MCTDHF model and its exchange values are not material
 parameters.  Its purpose is to validate the software/physics bridge:
 
-- zero exchange must recover the existing spin-blind exciton solver;
-- positive exchange must split the two spin sectors with the standard
-  two-open-shell sign convention;
-- the pair RDMs must continue to drive the correct Holstein-Peierls
-  Hellmann-Feynman forces;
-- singlet/triplet fixed-lattice and relaxed-lattice code paths can be tested
-  before the more expensive orbital self-consistency is introduced.
+- zero exchange recovers the existing spin-blind exciton solver;
+- positive exchange splits the two spin sectors with the standard two-open-shell
+  sign convention;
+- the pair RDMs continue to drive the Holstein-Peierls Hellmann-Feynman forces;
+- the structural gradient agrees with finite differences in the presence of the
+  exchange control.
 
 In the one-site atomic control,
 
@@ -90,25 +106,30 @@ and therefore `E_S - E_T = 2 K`.
 This reduced bridge will remain a regression/reference backend after full
 open-shell SCF/MCTDHF is available.
 
-## Next S0 implementation step
+## Remaining S0 physics before coupled lattice relaxation
 
-The next code block is the state-specific **orbital optimization** for the
-open-shell functional.  It should use orbital rotations rather than independent
-diagonalization of each shell Fock matrix, because the Miranda variational
-condition couples different occupation shells and contains gauge freedom within
-each shell.
+The next step is **not** to couple the many-electron open-shell density directly
+to the old one-carrier Holstein force.  Doing that would incorrectly let the
+entire neutral electronic background drive the molecular deformation.
 
-The first optimizer validation sequence will be:
+Before simultaneous open-shell electronic + lattice relaxation, the excited
+state must be referenced consistently to the neutral closed-shell background.
+For the molecular-crystal problem this requires an explicit excitation-density
+(or equivalent two-band HOMO/LUMO) construction so that the lattice couples to
+the electronic change associated with the excitation rather than to all
+occupied electrons.
 
-1. closed-shell small-lattice convergence;
-2. open-shell singlet and triplet on a tiny isotropic lattice;
-3. finite-difference derivative of the energy with respect to orbital rotations;
-4. comparison with direct determinant/configuration construction on very small
-   Hubbard-like systems;
-5. exchange-off singlet/triplet degeneracy;
-6. exchange-on state ordering and `<S^2>` checks;
-7. only then, simultaneous electronic + lattice relaxation using the canonical
-   isotropic `J1=J2=0.100`, `alpha1=alpha2=3.0` control.
+The remaining S0 sequence is therefore:
 
-No dynamics propagator, thermostat, field, GPU path, or material-specific
-parameterization is introduced in S0.
+1. define the neutral closed-shell reference and excitation-density convention;
+2. validate the corresponding electronic energy difference against tiny exact
+   controls;
+3. derive the Holstein and Peierls structural derivatives for the excitation
+   energy;
+4. verify all structural derivatives by central finite differences;
+5. perform the first simultaneous singlet/triplet + lattice relaxations using
+   the canonical isotropic `J1=J2=0.100`, `alpha1=alpha2=3.0` control;
+6. only after these gates pass, promote S0 and move to O0 occupations/yields.
+
+No dynamics propagator, thermostat, electric field, GPU path, or
+material-specific parameterization is introduced in S0.
