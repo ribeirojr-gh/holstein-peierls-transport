@@ -8,21 +8,25 @@ keeps three conventions explicit:
 2. a HOMO->LUMO excitation therefore leaves ``N/2-1`` closed orbitals plus two
    frontier electrons for an even ``N``-site lattice;
 3. small deterministic lattice seeds are used only to break the translational
-   symmetry of the perfectly isotropic control. They are not material data.
+   symmetry of the isotropic control. They are not material data.
 
-The x- and y-bond seeds are related by the square-lattice symmetry and are used
-as an important regression: after relaxation their energies must agree within
-numerical tolerance if both converge to symmetry-equivalent minima.
+A nearest-neighbour isotropic square lattice is exactly gapless at half filling
+for every periodic even-site rectangular cell. That degeneracy makes a
+state-specific HOMO->LUMO Born-Oppenheimer surface non-smooth and is therefore
+a poor validation target. The S0 *benchmark* uses a checkerboard site-energy
+control, ``+gap/2`` and ``-gap/2``, which preserves the x/y square symmetry but
+opens a defined one-particle gap. This staggered term is a numerical validation
+control, not a material parameter and not part of the historical carrier model.
 
 The structural optimizer does not reuse the legacy component-wise RPROP step.
 For the neutral-referenced excited-state surface the harmonic lattice Hessian is
 known analytically: ``K1 I`` for the intramolecular coordinate and a periodic
 one-dimensional Laplacian with stiffness ``K2`` for each intermolecular row or
-column.  We therefore solve the corresponding Newton/preconditioned-gradient
-direction exactly at fixed electronic state and perform an Armijo line search
-on the fully reoptimized Born-Oppenheimer energy.  The translational zero modes
-of the Peierls coordinates are fixed to zero mean through the Moore-Penrose
-pseudoinverse of the periodic Laplacian.
+column. We solve the corresponding Newton/preconditioned-gradient direction at
+fixed electronic state and perform an Armijo line search on the fully
+reoptimized Born-Oppenheimer energy. Translational zero modes of the Peierls
+coordinates are fixed to zero mean through the Moore-Penrose pseudoinverse of
+the periodic Laplacian.
 
 Each accepted geometry carries an electronically converged neutral and excited
 state. If a warm start fails its strict orbital-gradient gate, deterministic
@@ -77,6 +81,53 @@ def half_filled_n_closed(n_sites: int) -> int:
     return n_sites // 2 - 1
 
 
+def isotropic_staggered_site_energies(
+    parameters: StaticPolaronParameters,
+    gap: float,
+) -> np.ndarray:
+    """Return checkerboard ``+gap/2,-gap/2`` site energies for the S0 control.
+
+    The full noninteracting band gap is ``gap``. For nonzero gap both periodic
+    dimensions must be even so the bipartite checkerboard is compatible with
+    the boundary conditions and remains exactly symmetric under x/y exchange.
+    """
+    if gap < 0.0:
+        raise ValueError("staggered control gap must be non-negative")
+    if gap == 0.0:
+        return np.zeros((parameters.ny, parameters.nx), dtype=np.float64)
+    if parameters.nx % 2 != 0 or parameters.ny % 2 != 0:
+        raise ValueError("nonzero checkerboard gap requires even nx and ny")
+    y, x = np.indices((parameters.ny, parameters.nx), dtype=np.int64)
+    parity = np.where((x + y) % 2 == 0, -1.0, 1.0)
+    return np.asarray(0.5 * gap * parity, dtype=np.float64)
+
+
+def _electronic_control_lattice(
+    lattice: LatticeState,
+    parameters: StaticPolaronParameters,
+    staggered_gap: float,
+) -> LatticeState:
+    """Embed the static checkerboard potential only in the electronic Hamiltonian.
+
+    ``build_dense_hamiltonian`` represents diagonal site energy as
+    ``alpha_intra*u``. We therefore add the static potential divided by
+    ``alpha_intra`` to an internal lattice copy used only by the electronic
+    solver. The returned physical lattice, elastic energy, and structural
+    derivative continue to use the unshifted coordinates, so the checkerboard
+    term has no spurious elastic cost or force.
+    """
+    if staggered_gap == 0.0:
+        return lattice
+    if parameters.alpha_intra == 0.0:
+        raise ValueError("staggered control gap requires nonzero alpha_intra")
+    site_energy = isotropic_staggered_site_energies(parameters, staggered_gap)
+    return LatticeState(
+        u=np.asarray(lattice.u + site_energy / parameters.alpha_intra, dtype=np.float64),
+        vx=np.asarray(lattice.vx, dtype=np.float64).copy(),
+        vy=np.asarray(lattice.vy, dtype=np.float64).copy(),
+    )
+
+
 def isotropic_relaxation_seed(
     parameters: StaticPolaronParameters,
     seed: IsotropicRelaxationSeed | str,
@@ -107,8 +158,8 @@ def isotropic_relaxation_seed(
             ((cy - 1) % parameters.ny, cx),
         }
         share = amplitude / len(neighbours)
-        for y, x in neighbours:
-            u[y, x] += share
+        for y_index, x_index in neighbours:
+            u[y_index, x_index] += share
     elif seed_kind is IsotropicRelaxationSeed.BOND_X:
         vx[cy, cx] = +0.5 * amplitude
         vx[cy, (cx + 1) % parameters.nx] = -0.5 * amplitude
@@ -125,14 +176,7 @@ def _periodic_laplacian_pseudoinverse(
     stiffness: float,
     axis: int,
 ) -> np.ndarray:
-    """Solve ``stiffness * L x = rhs`` with the periodic zero mode fixed to zero.
-
-    ``L`` is the positive semidefinite nearest-neighbour Laplacian
-    ``2*x_i-x_{i-1}-x_{i+1}``. The right-hand side is projected onto the
-    zero-mean subspace before inversion. This is exactly the Moore-Penrose
-    solution and keeps the physically irrelevant rigid Peierls translation at
-    zero.
-    """
+    """Solve ``stiffness * L x = rhs`` with the periodic zero mode fixed to zero."""
     values = np.asarray(rhs, dtype=np.float64)
     if values.ndim != 2:
         raise ValueError("periodic lattice solve requires a two-dimensional array")
@@ -160,13 +204,7 @@ def harmonic_lattice_newton_direction(
     parameters: StaticPolaronParameters,
     gradient,
 ) -> LatticeState:
-    """Return the exact fixed-electronic-state Newton direction for the lattice.
-
-    The electronic Hellmann-Feynman contribution is linear in the coordinates
-    for the present frozen density-density interaction. Consequently the
-    structural Hessian is just the harmonic lattice Hessian. Peierls zero modes
-    are handled by the periodic Laplacian pseudoinverse.
-    """
+    """Return the exact fixed-electronic-state Newton direction for the lattice."""
     delta_u = -np.asarray(gradient.u, dtype=np.float64) / parameters.k1
     delta_vx = _periodic_laplacian_pseudoinverse(
         -np.asarray(gradient.vx, dtype=np.float64),
@@ -214,15 +252,8 @@ def _displaced_lattice(
 def _combine_best_electronic_results(
     states: list[ReferencedExcitationState],
 ) -> ReferencedExcitationState:
-    """Combine the best independently optimized neutral/excited states.
-
-    Neutral and excited variational problems are independent at a fixed lattice.
-    Recovery attempts can therefore contribute their best converged component
-    separately. If no attempt converged for a component, the smallest residual
-    orbital gradient is retained so failure remains visible in diagnostics.
-    """
+    """Combine the best independently optimized neutral/excited states."""
     first = states[0]
-
     neutral_converged = [s.neutral for s in states if s.neutral.diagnostics.converged]
     if neutral_converged:
         neutral = min(neutral_converged, key=lambda result: result.energy)
@@ -261,11 +292,15 @@ def _solve_electronic_with_recovery(
     excited_orbitals: np.ndarray | None,
     orbital_gradient_tolerance: float,
     orbital_max_iterations: int,
+    staggered_gap: float,
 ) -> ReferencedExcitationState:
     """Solve one geometry, recovering deterministically from a bad warm start."""
+    electronic_lattice = _electronic_control_lattice(
+        lattice, parameters, staggered_gap
+    )
     attempts: list[ReferencedExcitationState] = []
     primary = solve_referenced_excitation(
-        lattice,
+        electronic_lattice,
         parameters,
         interaction,
         n_closed=n_closed,
@@ -281,7 +316,7 @@ def _solve_electronic_with_recovery(
 
     excited_seed = primary.neutral.orbitals if primary.neutral.diagnostics.converged else None
     recovery = solve_referenced_excitation(
-        lattice,
+        electronic_lattice,
         parameters,
         interaction,
         n_closed=n_closed,
@@ -297,7 +332,7 @@ def _solve_electronic_with_recovery(
         return combined
 
     cold = solve_referenced_excitation(
-        lattice,
+        electronic_lattice,
         parameters,
         interaction,
         n_closed=n_closed,
@@ -321,6 +356,7 @@ def _harmonic_preconditioned_relaxation(
     orbital_gradient_tolerance: float,
     orbital_max_iterations: int,
     gradient_convergence_criterion: float,
+    staggered_gap: float,
     armijo_constant: float = 1.0e-4,
     line_search_shrink: float = 0.5,
     minimum_line_search_step: float = 2.0**-24,
@@ -344,6 +380,7 @@ def _harmonic_preconditioned_relaxation(
         excited_orbitals=None,
         orbital_gradient_tolerance=orbital_gradient_tolerance,
         orbital_max_iterations=orbital_max_iterations,
+        staggered_gap=staggered_gap,
     )
     final_update = np.inf
     converged = False
@@ -388,6 +425,7 @@ def _harmonic_preconditioned_relaxation(
                 excited_orbitals=current.excited.orbitals,
                 orbital_gradient_tolerance=orbital_gradient_tolerance,
                 orbital_max_iterations=orbital_max_iterations,
+                staggered_gap=staggered_gap,
             )
             candidate_ok = (
                 candidate_state.neutral.diagnostics.converged
@@ -417,11 +455,7 @@ def _harmonic_preconditioned_relaxation(
     final_gradient_value = final_gradient.maximum_absolute_component
     neutral_ok = current.neutral.diagnostics.converged
     excited_ok = current.excited.diagnostics.converged
-    if (
-        neutral_ok
-        and excited_ok
-        and final_gradient_value < gradient_convergence_criterion
-    ):
+    if neutral_ok and excited_ok and final_gradient_value < gradient_convergence_criterion:
         final_update = 0.0
         converged = True
 
@@ -451,14 +485,16 @@ def relax_isotropic_spin_branch(
     orbital_gradient_tolerance: float = 1.0e-8,
     orbital_max_iterations: int = 800,
     gradient_convergence_criterion: float = 1.0e-6,
+    staggered_gap: float = 0.8,
 ) -> SpinRelaxationBranchResult:
-    """Relax one half-filled singlet/triplet branch from a canonical seed."""
+    """Relax one half-filled singlet/triplet branch from a canonical gapped seed."""
     if parameters.nx != parameters.ny:
         raise ValueError("the canonical isotropic relaxation benchmark requires nx=ny")
     if not np.isclose(parameters.j0x, parameters.j0y):
         raise ValueError("the canonical relaxation benchmark requires Jx=Jy")
     if not np.isclose(parameters.alpha_interx, parameters.alpha_intery):
         raise ValueError("the canonical relaxation benchmark requires alpha_x=alpha_y")
+    isotropic_staggered_site_energies(parameters, staggered_gap)
 
     seed_kind = IsotropicRelaxationSeed(seed)
     initial_lattice = isotropic_relaxation_seed(
@@ -475,6 +511,7 @@ def relax_isotropic_spin_branch(
         orbital_gradient_tolerance=orbital_gradient_tolerance,
         orbital_max_iterations=orbital_max_iterations,
         gradient_convergence_criterion=gradient_convergence_criterion,
+        staggered_gap=staggered_gap,
     )
     return SpinRelaxationBranchResult(
         multiplicity=multiplicity,
