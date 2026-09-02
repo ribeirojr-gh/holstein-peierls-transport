@@ -18,6 +18,31 @@ jobs:
       - name: Run tests
         run: pytest
 
+  d0a-frozen-propagators:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install package
+        run: python -m pip install -e '.[dev]'
+      - name: Run deterministic D0a benchmark
+        run: |
+          mkdir -p benchmark
+          python experiments/d0a_frozen_propagators.py \
+            --nx 4 \
+            --ny 4 \
+            --dt-fs 0.1 \
+            --steps 20 \
+            --krylov-dimension 8 \
+            --output benchmark/d0a-frozen.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: d0a-frozen-propagators
+          path: benchmark/d0a-frozen.json
+
   s0-relaxation:
     runs-on: ubuntu-latest
     strategy:
