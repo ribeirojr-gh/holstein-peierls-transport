@@ -1,0 +1,46 @@
+name: s0-gap-scan
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/s0-gap-scan.yml'
+      - 'experiments/spin_adapted_isotropic_relaxation.py'
+      - 'src/holstein_peierls/spin_adapted/**'
+  workflow_dispatch:
+
+concurrency:
+  group: s0-gap-scan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gap-scan:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        staggered_gap: [1.2, 1.6, 2.0]
+        multiplicity: [singlet, triplet]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install package
+        run: python -m pip install -e '.[dev]'
+      - name: Run diagnostic 4x4 S0 gap scan
+        run: |
+          mkdir -p gap-scan
+          python experiments/spin_adapted_isotropic_relaxation.py \
+            --size 4 \
+            --staggered-gap '${{ matrix.staggered_gap }}' \
+            --multiplicity '${{ matrix.multiplicity }}' \
+            --seed bond_x \
+            --output 'gap-scan/gap-${{ matrix.staggered_gap }}-${{ matrix.multiplicity }}.json'
+      - name: Upload diagnostic result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s0-gap-${{ matrix.staggered_gap }}-${{ matrix.multiplicity }}
+          path: gap-scan/*.json
+          if-no-files-found: warn
