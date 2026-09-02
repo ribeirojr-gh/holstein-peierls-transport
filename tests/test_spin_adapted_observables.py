@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from holstein_peierls.exciton.solver import ExcitonGroundState
 from holstein_peierls.spin_adapted import (
     channel_projector,
     channel_yield_from_density,
@@ -47,6 +48,27 @@ def test_one_rdm_trace_and_static_occupation_pattern() -> None:
     assert np.trace(gamma) == pytest.approx(3.0)
     occupations = instantaneous_occupation_numbers(gamma, basis)
     np.testing.assert_allclose(occupations, [2.0, 1.0, 0.0, 0.0], atol=0.0)
+
+
+def test_distinguishable_exciton_rdms_feed_the_same_occupation_api() -> None:
+    wavefunction = np.eye(2, dtype=np.float64) / np.sqrt(2.0)
+    exciton = ExcitonGroundState(energy=-1.0, wavefunction=wavefunction)
+    rotated = np.array(
+        [[1.0, 1.0], [1.0, -1.0]], dtype=np.complex128
+    ) / np.sqrt(2.0)
+
+    electron = instantaneous_occupation_numbers(
+        exciton.electron_density_matrix,
+        rotated,
+    )
+    hole = instantaneous_occupation_numbers(
+        exciton.hole_density_matrix,
+        rotated,
+    )
+    np.testing.assert_allclose(electron, [0.5, 0.5], atol=2.0e-15)
+    np.testing.assert_allclose(hole, [0.5, 0.5], atol=2.0e-15)
+    assert np.sum(electron) == pytest.approx(1.0)
+    assert np.sum(hole) == pytest.approx(1.0)
 
 
 def test_occupations_are_invariant_to_orbital_phases() -> None:
