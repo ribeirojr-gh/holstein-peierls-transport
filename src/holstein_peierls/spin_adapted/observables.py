@@ -113,7 +113,7 @@ def instantaneous_occupation_numbers(
     diagonal = np.diag(projected)
     if np.max(np.abs(np.imag(diagonal)), initial=0.0) > hermiticity_tolerance:
         raise RuntimeError("projected occupations acquired a non-negligible imaginary part")
-    result = np.asarray(np.real(diagonal), dtype=np.float64)
+    result = np.array(np.real(diagonal), dtype=np.float64, copy=True)
     tiny = 64.0 * np.finfo(np.float64).eps
     result[np.abs(result) < tiny] = 0.0
     return result
