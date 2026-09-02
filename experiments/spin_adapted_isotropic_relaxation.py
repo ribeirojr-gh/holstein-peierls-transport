@@ -1,15 +1,17 @@
 """Benchmark fully relaxed spin-adapted excitations on the isotropic S0 control.
 
-This experiment is intentionally material agnostic.  It uses the canonical
-coding control
+This experiment is intentionally material agnostic. It uses
 
     J1 = J2 = 0.100 eV
     alpha1 = alpha2 = 3.0 eV/A
 
 with the historical K1/K2 values and a simple density-density validation
-interaction.  The neutral pi system is half filled.  Multiple small structural
-seeds are used to detect symmetry-related or metastable minima rather than to
-supply physical material information.
+interaction. The neutral pi system is half filled. Because the periodic
+nearest-neighbour square lattice is exactly gapless at half filling, the
+benchmark also uses a checkerboard site-energy term with a configurable full
+one-particle gap (default 0.8 eV). The staggered gap is a validation control,
+not material data. Multiple small structural seeds detect symmetry-related or
+metastable minima rather than supplying physical material information.
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--size", type=int, default=4)
     parser.add_argument("--onsite-u", type=float, default=0.525)
     parser.add_argument("--nearest-v", type=float, default=0.08)
+    parser.add_argument("--staggered-gap", type=float, default=0.8)
     parser.add_argument("--seed-amplitude", type=float, default=1.0e-3)
     parser.add_argument("--orbital-tolerance", type=float, default=1.0e-8)
     parser.add_argument("--orbital-max-iterations", type=int, default=800)
@@ -100,7 +103,9 @@ def _selected_seeds(name: str) -> tuple[IsotropicRelaxationSeed, ...]:
 def main() -> None:
     args = _parser().parse_args()
     if args.size % 2 != 0:
-        raise SystemExit("--size must be even for the half-filled closed-shell reference")
+        raise SystemExit("--size must be even for the half-filled checkerboard control")
+    if args.staggered_gap < 0.0:
+        raise SystemExit("--staggered-gap must be non-negative")
 
     control = IsotropicControlParameters()
     parameters = control.to_polaron_parameters(
@@ -126,6 +131,7 @@ def main() -> None:
                 orbital_gradient_tolerance=args.orbital_tolerance,
                 orbital_max_iterations=args.orbital_max_iterations,
                 gradient_convergence_criterion=args.gradient_tolerance,
+                staggered_gap=args.staggered_gap,
             )
             summaries.append(_branch_summary(branch))
 
@@ -171,6 +177,7 @@ def main() -> None:
             "K2_eV_per_A2": control.k2,
             "onsite_U_eV": args.onsite_u,
             "nearest_neighbor_V_eV": args.nearest_v,
+            "staggered_one_particle_gap_eV": args.staggered_gap,
             "seed_amplitude_A": args.seed_amplitude,
         },
         "branches": summaries,
