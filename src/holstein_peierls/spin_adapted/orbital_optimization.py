@@ -186,7 +186,7 @@ def optimize_open_shell_orbitals(
     minimum_step: float = 1.0e-12,
     growth_factor: float = 1.25,
     shrink_factor: float = 0.5,
-    energy_decrease_tolerance: float = 1.0e-14,
+    energy_decrease_tolerance: float = 0.0,
 ) -> OpenShellOrbitalResult:
     """Minimize the fixed-coefficient open-shell energy by orbital rotations."""
     if gradient_tolerance <= 0.0:
@@ -199,6 +199,8 @@ def optimize_open_shell_orbitals(
         raise ValueError("growth_factor must exceed one")
     if not 0.0 < shrink_factor < 1.0:
         raise ValueError("shrink_factor must lie between zero and one")
+    if energy_decrease_tolerance < 0.0:
+        raise ValueError("energy_decrease_tolerance must be non-negative")
 
     c = _validate_orbitals(initial_orbitals)
     _validate_shell_sizes(c.shape[1], shell_sizes, definition)
