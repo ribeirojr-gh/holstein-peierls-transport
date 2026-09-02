@@ -7,7 +7,10 @@ from holstein_peierls.spin_adapted import (
     channel_yield_from_density,
     channel_yield_from_state,
     configuration_channel_yield,
+    determinant_overlap_matrix,
     instantaneous_occupation_numbers,
+    multiconfigurational_overlap,
+    multiconfigurational_yield,
     occupation_numbers_from_propagated_orbitals,
     one_rdm_from_orbitals,
     slater_determinant_overlap,
@@ -157,6 +160,25 @@ def test_slater_determinant_overlap_uses_determinant_of_orbital_overlaps() -> No
 
     right_orthogonal = np.column_stack([basis[:, 0], basis[:, 2]])
     assert slater_determinant_overlap(left, right_orthogonal) == pytest.approx(0.0)
+
+
+def test_multiconfigurational_overlap_combines_determinants_coherently() -> None:
+    basis = np.eye(4, dtype=np.complex128)
+    determinant_a = np.column_stack([basis[:, 0], basis[:, 1]])
+    determinant_b = np.column_stack([basis[:, 2], basis[:, 3]])
+    configurations = np.stack([determinant_a, determinant_b])
+
+    overlap_matrix = determinant_overlap_matrix(configurations, configurations)
+    np.testing.assert_allclose(overlap_matrix, np.eye(2), atol=0.0)
+
+    plus = np.array([1.0, 1.0], dtype=np.complex128) / np.sqrt(2.0)
+    minus = np.array([1.0, -1.0], dtype=np.complex128) / np.sqrt(2.0)
+    assert multiconfigurational_overlap(
+        plus, configurations, plus, configurations
+    ) == pytest.approx(1.0, abs=2.0e-15)
+    assert multiconfigurational_yield(
+        plus, configurations, minus, configurations
+    ) == pytest.approx(0.0, abs=2.0e-15)
 
 
 def test_observable_validation_rejects_invalid_inputs() -> None:
