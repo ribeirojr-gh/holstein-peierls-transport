@@ -32,7 +32,9 @@ Each accepted geometry carries an electronically converged neutral and excited
 state. If a warm start fails its strict orbital-gradient gate, deterministic
 cold/reseeded recovery attempts are made at the same geometry before the
 candidate can enter the structural line search. This prevents unconverged
-electronic forces from moving the lattice.
+electronic forces from moving the lattice. Structural convergence requires both
+the true last accepted coordinate update and the final structural gradient to
+pass their independent gates.
 """
 
 from __future__ import annotations
@@ -382,7 +384,9 @@ def _harmonic_preconditioned_relaxation(
         orbital_max_iterations=orbital_max_iterations,
         staggered_gap=staggered_gap,
     )
-    final_update = np.inf
+    # No coordinate move has been made yet. This also lets an already stationary
+    # seed satisfy the update gate without manufacturing a fictitious update.
+    final_update = 0.0
     converged = False
     iteration = 0
 
@@ -394,8 +398,10 @@ def _harmonic_preconditioned_relaxation(
 
         if not (neutral_ok and excited_ok):
             break
-        if gradient_value < gradient_convergence_criterion:
-            final_update = 0.0
+        if (
+            final_update < parameters.convergence_criterion
+            and gradient_value < gradient_convergence_criterion
+        ):
             converged = True
             break
 
@@ -455,9 +461,12 @@ def _harmonic_preconditioned_relaxation(
     final_gradient_value = final_gradient.maximum_absolute_component
     neutral_ok = current.neutral.diagnostics.converged
     excited_ok = current.excited.diagnostics.converged
-    if neutral_ok and excited_ok and final_gradient_value < gradient_convergence_criterion:
-        final_update = 0.0
-        converged = True
+    converged = converged or (
+        neutral_ok
+        and excited_ok
+        and final_update < parameters.convergence_criterion
+        and final_gradient_value < gradient_convergence_criterion
+    )
 
     return StaticReferencedExcitationResult(
         lattice=lattice,
