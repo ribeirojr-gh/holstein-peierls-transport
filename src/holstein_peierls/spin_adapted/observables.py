@@ -241,3 +241,81 @@ def slater_determinant_overlap(
         raise ValueError("left and right occupied-orbital matrices must have same shape")
     overlap_matrix = left.conj().T @ right
     return complex(np.linalg.det(overlap_matrix))
+
+
+def determinant_overlap_matrix(
+    left_configurations: ArrayLike,
+    right_configurations: ArrayLike,
+) -> ComplexArray:
+    """Return all pairwise overlaps between two determinant lists.
+
+    Each input has shape ``(n_configurations, n_basis, n_occupied)``.  Individual
+    entries are evaluated with the Slater determinant overlap formula.
+    """
+    left = np.asarray(left_configurations, dtype=np.complex128)
+    right = np.asarray(right_configurations, dtype=np.complex128)
+    if left.ndim != 3 or right.ndim != 3:
+        raise ValueError("determinant configuration arrays must be three-dimensional")
+    if left.shape[1:] != right.shape[1:]:
+        raise ValueError("left and right determinant orbital dimensions must match")
+    result = np.empty((left.shape[0], right.shape[0]), dtype=np.complex128)
+    for i in range(left.shape[0]):
+        for j in range(right.shape[0]):
+            result[i, j] = slater_determinant_overlap(left[i], right[j])
+    return result
+
+
+def multiconfigurational_overlap(
+    left_coefficients: ArrayLike,
+    left_configurations: ArrayLike,
+    right_coefficients: ArrayLike,
+    right_configurations: ArrayLike,
+    *,
+    normalization_tolerance: float = 1.0e-14,
+) -> complex:
+    """Return a normalized coherent overlap of two determinant expansions.
+
+    The determinant sets may be built from different instantaneous orbital
+    bases.  Their cross and self overlap matrices are evaluated explicitly, and
+    all configuration amplitudes are combined *before* taking a modulus.
+    """
+    left_c = np.asarray(left_coefficients, dtype=np.complex128)
+    right_c = np.asarray(right_coefficients, dtype=np.complex128)
+    left_cfg = np.asarray(left_configurations, dtype=np.complex128)
+    right_cfg = np.asarray(right_configurations, dtype=np.complex128)
+    if left_c.ndim != 1 or right_c.ndim != 1:
+        raise ValueError("multiconfigurational coefficients must be one-dimensional")
+    if left_cfg.ndim != 3 or right_cfg.ndim != 3:
+        raise ValueError("determinant configuration arrays must be three-dimensional")
+    if left_c.size != left_cfg.shape[0] or right_c.size != right_cfg.shape[0]:
+        raise ValueError("coefficient counts must match determinant counts")
+
+    cross = determinant_overlap_matrix(left_cfg, right_cfg)
+    left_metric = determinant_overlap_matrix(left_cfg, left_cfg)
+    right_metric = determinant_overlap_matrix(right_cfg, right_cfg)
+    left_norm = float(np.real(np.vdot(left_c, left_metric @ left_c)))
+    right_norm = float(np.real(np.vdot(right_c, right_metric @ right_c)))
+    if left_norm <= normalization_tolerance or right_norm <= normalization_tolerance:
+        raise ValueError("multiconfigurational state has numerically zero norm")
+    numerator = np.vdot(left_c, cross @ right_c)
+    return complex(numerator / np.sqrt(left_norm * right_norm))
+
+
+def multiconfigurational_yield(
+    target_coefficients: ArrayLike,
+    target_configurations: ArrayLike,
+    propagated_coefficients: ArrayLike,
+    propagated_configurations: ArrayLike,
+) -> float:
+    """Return ``|<target|propagated>|^2`` for determinant expansions."""
+    overlap = multiconfigurational_overlap(
+        target_coefficients,
+        target_configurations,
+        propagated_coefficients,
+        propagated_configurations,
+    )
+    result = float(abs(overlap) ** 2)
+    tolerance = 128.0 * np.finfo(np.float64).eps
+    if result > 1.0 and result < 1.0 + tolerance:
+        return 1.0
+    return result
