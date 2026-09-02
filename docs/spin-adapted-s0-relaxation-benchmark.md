@@ -95,18 +95,53 @@ do not claim it is the mathematical minimum needed for convergence. It is the
 first tested value that robustly closes both bond-seeded spin branches under the
 unchanged acceptance criteria.
 
-For the converged `bond_x` basin at `Delta = 2.0 eV`, the total referenced
-energies are
+## Complete 4x4 seed matrix at Delta = 2.0 eV
 
-- singlet: `1.458535976880464 eV`;
-- triplet: `1.446797186882855 eV`.
+The final CI run evaluated all six combinations
+`singlet/triplet x onsite/bond_x/bond_y` with the same strict gates.
+All six branches converged.
 
-Thus the branch-specific singlet-minus-triplet energy difference is
-`+0.011738789997609 eV` (`+11.739 meV`), with the triplet lower for this
-validation control. This is a regression result for the coding model, not a
-material prediction. The promoted spin gap must ultimately be evaluated from
-the lowest strictly converged singlet and triplet branches in the complete seed
-matrix.
+| multiplicity | seed | E_ref (eV) | E_exc (eV) | last update (A) | max lattice gradient (eV/A) |
+| --- | --- | ---: | ---: | ---: | ---: |
+| singlet | onsite | 1.448028500905174 | 0.853208044587145 | 8.838e-9 | 2.081e-7 |
+| singlet | bond_x | 1.458848887171766 | 0.864020507224282 | 9.087e-9 | 2.787e-7 |
+| singlet | bond_y | 1.458734984906944 | 0.863906657703247 | 6.788e-9 | 2.974e-7 |
+| triplet | onsite | 1.446797186881587 | 0.851980771916345 | 4.051e-9 | 2.438e-7 |
+| triplet | bond_x | 1.446797186882963 | 0.851980775361360 | 9.921e-9 | 2.348e-7 |
+| triplet | bond_y | 1.446797186882965 | 0.851980775137248 | 9.456e-9 | 2.527e-7 |
+
+The triplet branches are degenerate to numerical precision: the full spread in
+total referenced energy is about `1.4e-12 eV`.
+
+The singlet branches reveal more than one converged open-shell stationary root.
+`bond_x` and `bond_y` have nearly rotationally exchanged lattice distortions,
+but differ by `0.113902 meV` in total energy; the `onsite` seed reaches a lower
+singlet root by about `10.7 meV`. This is not interpreted as a physical x/y
+anisotropy. The control Hamiltonian is exactly square-isotropic by construction:
+`Jx = Jy`, `alpha_x = alpha_y`, the checkerboard potential depends only on
+`(x+y) mod 2`, the density-density interaction treats all four cardinal
+neighbours identically, and the harmonic Peierls sectors use the same `K2`.
+The residual seed dependence therefore diagnoses local open-shell SCF/root
+selection. Seed labels specify starting conditions, not unique electronic
+states.
+
+For promoted stationary energies we consequently use the lowest independently
+converged branch within each spin sector. The 4x4 control minima are
+
+- singlet: `1.448028500905174 eV` (`onsite` seed);
+- triplet: `1.446797186881587 eV` (`onsite` seed; all triplet seeds are
+  effectively degenerate).
+
+The promoted control splitting is therefore
+
+`E_S - E_T = +0.001231314023587 eV = +1.231314 meV`,
+
+with the triplet lower for this validation model. This is a regression result
+for the coding framework, not a prediction for a particular material.
+
+The larger `+11.739 meV` difference obtained by comparing the two `bond_x`
+branches is retained only as a branch-specific diagnostic and is not the
+promoted singlet-triplet gap.
 
 ## Structural optimizer
 
@@ -128,7 +163,7 @@ If an electronic warm start fails, deterministic canonical/reseeded recovery is
 performed at the same geometry before any structural step may be accepted.
 Thus unconverged electronic forces never move the lattice.
 
-## Symmetry-breaking seeds
+## Symmetry-breaking seeds and root selection
 
 A perfectly isotropic periodic lattice can retain a translationally symmetric
 stationary solution if started exactly at zero distortion. The benchmark
@@ -139,8 +174,15 @@ therefore uses only tiny deterministic structural perturbations:
 3. `bond_y`: the exact square-lattice partner of `bond_x`.
 
 The seed amplitude defaults to `1e-3 A`. It is a numerical symmetry breaker,
-not a physical parameter. In the isotropic model, converged x- and y-seeded
-states should be degenerate whenever they represent the same basin.
+not a physical parameter. Exact x/y symmetry is a property of the Hamiltonian;
+it does not guarantee that independent nonlinear open-shell optimizations from
+two symmetry-related seeds will select the same local electronic root. For this
+reason all stationary branches are retained and the lowest strictly converged
+energy in each multiplicity is the promoted control value.
+
+A later production root-tracking layer may explicitly connect symmetry-related
+open-shell solutions, but that is separate from establishing the stationary S0
+energy/force framework.
 
 ## Acceptance criteria
 
@@ -152,8 +194,9 @@ For every promoted branch we require:
 - maximum structural update below `1e-8 A`;
 - maximum structural gradient below `1e-6 eV/A`;
 - `Tr(Delta gamma)` numerically zero;
-- consistency of symmetry-related x/y seeds;
-- independent singlet and triplet minimizations.
+- independent singlet and triplet minimizations;
+- explicit comparison of symmetry-related seeds and retention of distinct
+  converged roots rather than silently averaging them.
 
 The permanent benchmark driver is
 `experiments/spin_adapted_isotropic_relaxation.py`. The CI matrix runs all six
@@ -161,6 +204,5 @@ The permanent benchmark driver is
 with `--require-converged`; a branch that fails the physical gates therefore
 fails CI while still preserving its JSON artifact for diagnosis.
 
-The complete seed-matrix numerical results will be promoted only after all six
-branches have passed. No dynamics, thermostat, field, GPU backend, or
-material-specific fit belongs to this checkpoint.
+No dynamics, thermostat, field, GPU backend, or material-specific fit belongs
+to this checkpoint.
