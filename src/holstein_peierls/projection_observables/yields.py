@@ -1,15 +1,14 @@
-"""Many-electron projection amplitudes and yields.
+"""Projection amplitudes and yields for one- and many-particle states.
 
-For a normalized evolved many-electron state ``|Psi(t)>`` and a normalized
-configuration ``|Phi_K>``, the literature defines the relative yield as
+For a normalized evolved state ``|Psi(t)>`` and a normalized reference
+configuration ``|Phi_K>``, the relative projection yield is
 
     I_K(t) = |<Phi_K|Psi(t)>|^2.
 
-For Slater determinants, the overlap is the determinant of the occupied-orbital
-overlap matrix. This module also supports coherent multiconfigurational
-expansions and projection onto a channel spanned by several, possibly
-non-orthogonal, reference configurations. The latter uses the Gram-matrix
-projector rather than blindly summing probabilities.
+The Slater-determinant functions implement the determinant-overlap formula used
+by the supplied many-electron references. Generic Hilbert-space projectors are
+also provided for states such as the distinguishable electron-hole wavefunction
+``Psi(i_e, i_h)`` that are not represented internally as Slater determinants.
 """
 
 from __future__ import annotations
@@ -20,6 +19,78 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 ComplexArray = NDArray[np.complex128]
+
+
+def _normalized_vector(values: ArrayLike, *, name: str) -> ComplexArray:
+    vector = np.asarray(values, dtype=np.complex128).reshape(-1)
+    if vector.size == 0:
+        raise ValueError(f"{name} must not be empty")
+    if not np.all(np.isfinite(vector)):
+        raise ValueError(f"{name} must be finite")
+    norm = float(np.linalg.norm(vector))
+    if norm == 0.0:
+        raise ValueError(f"{name} must have non-zero norm")
+    return np.asarray(vector / norm, dtype=np.complex128)
+
+
+def hilbert_channel_yield(
+    state: ArrayLike,
+    reference_states: Sequence[ArrayLike],
+    *,
+    rcond: float = 1.0e-12,
+    tolerance: float = 1.0e-10,
+) -> float:
+    """Project a state vector onto a possibly non-orthogonal reference subspace.
+
+    If ``G_ab=<phi_a|phi_b>`` and ``v_a=<phi_a|psi>``, the projection
+    probability is ``v^dagger G^+ v`` for normalized ``psi``. Reference vectors
+    may be linearly dependent; the Moore-Penrose pseudoinverse prevents double
+    counting.
+    """
+    if rcond <= 0.0 or tolerance <= 0.0:
+        raise ValueError("rcond and tolerance must be positive")
+    psi = _normalized_vector(state, name="state")
+    if len(reference_states) == 0:
+        raise ValueError("reference_states must contain at least one state")
+    references = tuple(
+        _normalized_vector(item, name=f"reference_states[{index}]")
+        for index, item in enumerate(reference_states)
+    )
+    if any(item.shape != psi.shape for item in references):
+        raise ValueError("state and reference vectors must have equal dimensions")
+
+    reference_matrix = np.column_stack(references)
+    gram = reference_matrix.conj().T @ reference_matrix
+    overlaps = reference_matrix.conj().T @ psi
+    metric = np.linalg.pinv(gram, rcond=rcond, hermitian=True)
+    value_complex = complex(overlaps.conj() @ metric @ overlaps)
+    if abs(value_complex.imag) > tolerance:
+        raise FloatingPointError("Hilbert-space channel yield has a non-negligible imaginary part")
+    value = float(value_complex.real)
+    if value < -tolerance or value > 1.0 + tolerance:
+        raise FloatingPointError("Hilbert-space channel yield lies outside [0, 1]")
+    return float(np.clip(value, 0.0, 1.0))
+
+
+def basis_mask_yield(state: ArrayLike, mask: ArrayLike) -> float:
+    """Return probability in a subset of an orthonormal computational basis.
+
+    ``state`` may have any shape (for example ``Psi[i_e, i_h]``); ``mask`` must
+    have the same shape and selects basis configurations belonging to the
+    physical channel. The state is normalized internally so the returned value
+    is always a probability.
+    """
+    amplitudes = np.asarray(state, dtype=np.complex128)
+    selected = np.asarray(mask, dtype=np.bool_)
+    if amplitudes.shape != selected.shape or amplitudes.size == 0:
+        raise ValueError("state and mask must be non-empty arrays of identical shape")
+    if not np.all(np.isfinite(amplitudes)):
+        raise ValueError("state amplitudes must be finite")
+    norm2 = float(np.vdot(amplitudes.reshape(-1), amplitudes.reshape(-1)).real)
+    if norm2 <= 0.0:
+        raise ValueError("state must have positive norm")
+    probability = np.abs(amplitudes) ** 2
+    return float(np.sum(probability[selected]) / norm2)
 
 
 def _configuration(values: ArrayLike, *, name: str) -> ComplexArray:
@@ -94,17 +165,15 @@ def configuration_expansion_overlap(
         raise ValueError("state_coefficients must match the number of configurations")
     if not np.all(np.isfinite(coefficients)):
         raise ValueError("state_coefficients must be finite")
-
     amplitudes = np.asarray(
-        [np.linalg.det(reference.conj().T @ state) for state in states],
+        [np.linalg.det(reference.conj().T @ item) for item in states],
         dtype=np.complex128,
     )
     return complex(amplitudes @ coefficients)
 
 
 def configuration_expansion_norm(
-    configurations: Sequence[ArrayLike],
-    coefficients: ArrayLike,
+    configurations: Sequence[ArrayLike], coefficients: ArrayLike
 ) -> float:
     """Return ``<Psi|Psi>`` for a determinant expansion."""
     configs = _configurations(configurations, name="configurations")
@@ -131,28 +200,18 @@ def channel_yield(
     rcond: float = 1.0e-12,
     tolerance: float = 1.0e-10,
 ) -> float:
-    """Project a configuration expansion onto the span of a reference channel.
-
-    If ``G_ab=<Phi_a|Phi_b>`` and ``v_a=<Phi_a|Psi>``, the normalized channel
-    probability is ``v^dagger G^+ v / <Psi|Psi>``. The pseudoinverse avoids
-    double counting for non-orthogonal or redundant reference configurations.
-    """
+    """Project a determinant expansion onto a reference-configuration channel."""
     if rcond <= 0.0 or tolerance <= 0.0:
         raise ValueError("rcond and tolerance must be positive")
     references = _configurations(reference_configurations, name="reference_configurations")
     states = _configurations(state_configurations, name="state_configurations")
     if references[0].shape != states[0].shape:
         raise ValueError("reference and state configurations must have equal dimensions")
-
     coefficients = np.asarray(state_coefficients, dtype=np.complex128)
     if coefficients.ndim != 1 or coefficients.shape[0] != len(states):
         raise ValueError("state_coefficients must match the state configuration count")
-
     overlaps = np.asarray(
-        [
-            configuration_expansion_overlap(reference, states, coefficients)
-            for reference in references
-        ],
+        [configuration_expansion_overlap(reference, states, coefficients) for reference in references],
         dtype=np.complex128,
     )
     gram = slater_gram_matrix(references)
@@ -160,13 +219,8 @@ def channel_yield(
     numerator = complex(overlaps.conj() @ projector_metric @ overlaps)
     if abs(numerator.imag) > tolerance:
         raise FloatingPointError("channel projection has a non-negligible imaginary part")
-
     denominator = configuration_expansion_norm(states, coefficients)
     value = float(numerator.real / denominator)
     if value < -tolerance or value > 1.0 + tolerance:
         raise FloatingPointError("channel yield lies outside the normalized probability interval")
-    if value < 0.0:
-        value = 0.0
-    elif value > 1.0:
-        value = 1.0
-    return value
+    return float(np.clip(value, 0.0, 1.0))
