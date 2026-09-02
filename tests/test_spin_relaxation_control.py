@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
@@ -5,6 +7,7 @@ from holstein_peierls.spin_adapted import (
     IsotropicControlParameters,
     IsotropicRelaxationSeed,
     half_filled_n_closed,
+    harmonic_lattice_newton_direction,
     isotropic_relaxation_seed,
 )
 
@@ -46,3 +49,38 @@ def test_x_and_y_bond_seeds_are_exact_isotropic_partners() -> None:
     )
     assert np.isclose(np.sum(x_seed.vx), 0.0, atol=1.0e-15)
     assert np.isclose(np.sum(y_seed.vy), 0.0, atol=1.0e-15)
+
+
+def test_harmonic_newton_direction_inverts_the_lattice_hessian() -> None:
+    parameters = IsotropicControlParameters().to_polaron_parameters(nx=6, ny=4)
+    rng = np.random.default_rng(17)
+
+    expected_u = rng.normal(size=(parameters.ny, parameters.nx))
+    expected_vx = rng.normal(size=(parameters.ny, parameters.nx))
+    expected_vx -= np.mean(expected_vx, axis=1, keepdims=True)
+    expected_vy = rng.normal(size=(parameters.ny, parameters.nx))
+    expected_vy -= np.mean(expected_vy, axis=0, keepdims=True)
+
+    gradient_u = -parameters.k1 * expected_u
+    gradient_vx = -parameters.k2 * (
+        2.0 * expected_vx
+        - np.roll(expected_vx, shift=1, axis=1)
+        - np.roll(expected_vx, shift=-1, axis=1)
+    )
+    gradient_vy = -parameters.k2 * (
+        2.0 * expected_vy
+        - np.roll(expected_vy, shift=1, axis=0)
+        - np.roll(expected_vy, shift=-1, axis=0)
+    )
+    gradient = SimpleNamespace(
+        u=gradient_u,
+        vx=gradient_vx,
+        vy=gradient_vy,
+    )
+
+    direction = harmonic_lattice_newton_direction(parameters, gradient)
+    np.testing.assert_allclose(direction.u, expected_u, atol=2.0e-12)
+    np.testing.assert_allclose(direction.vx, expected_vx, atol=2.0e-12)
+    np.testing.assert_allclose(direction.vy, expected_vy, atol=2.0e-12)
+    assert np.max(np.abs(np.mean(direction.vx, axis=1))) < 1.0e-13
+    assert np.max(np.abs(np.mean(direction.vy, axis=0))) < 1.0e-13
