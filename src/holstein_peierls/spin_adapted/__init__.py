@@ -1,9 +1,9 @@
-"""Spin-adapted static excited-state foundations.
+"""Spin-adapted static excited-state foundations and shared observables.
 
-This package is the S0 layer of the modernization roadmap.  It keeps the
-validated distinguishable electron-hole solver intact while adding the spin
-algebra and open-shell energy/Fock functionals required before a production
-MCTDHF dynamics is introduced.
+The package contains the stationary S0 layer and the integrator-independent O0
+observables required before production MCTDHF dynamics is introduced.  The
+validated distinguishable electron-hole solver remains intact while the
+spin-adapted and multiconfigurational layers are developed alongside it.
 """
 
 from .excitation_reference import (
@@ -19,6 +19,16 @@ from .excitation_reference import (
     spin_summed_rdm,
 )
 from .isotropic import IsotropicControlParameters
+from .observables import (
+    channel_projector,
+    channel_yield_from_density,
+    channel_yield_from_state,
+    configuration_channel_yield,
+    instantaneous_occupation_numbers,
+    occupation_numbers_from_propagated_orbitals,
+    one_rdm_from_orbitals,
+    slater_determinant_overlap,
+)
 from .open_shell import (
     CLOSED_SHELL_SINGLET,
     HIGH_SPIN_TRIPLET,
@@ -72,14 +82,21 @@ __all__ = [
     "SpinRelaxationBranchResult",
     "StaticReferencedExcitationResult",
     "StaticSpinAdaptedPairResult",
+    "channel_projector",
+    "channel_yield_from_density",
+    "channel_yield_from_state",
+    "configuration_channel_yield",
     "density_density_control_interaction",
     "exchange_control_matrix",
     "general_open_shell_energy",
     "half_filled_n_closed",
     "harmonic_lattice_newton_direction",
+    "instantaneous_occupation_numbers",
     "isotropic_relaxation_seed",
     "isotropic_staggered_site_energies",
     "minimal_open_shell_coefficients",
+    "occupation_numbers_from_propagated_orbitals",
+    "one_rdm_from_orbitals",
     "open_shell_orbital_energy",
     "optimize_open_shell_orbitals",
     "orbital_rotation_gradient",
@@ -93,6 +110,7 @@ __all__ = [
     "shell_fock_matrices",
     "shell_projectors_from_complete_orbitals",
     "singlet_triplet_gap",
+    "slater_determinant_overlap",
     "solve_referenced_excitation",
     "solve_spin_adapted_pair",
     "spin_summed_rdm",
