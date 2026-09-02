@@ -39,11 +39,7 @@ def _distorted_lattice() -> LatticeState:
 def _problem():
     # Canonical coding control requested for S0: J1=J2=current J1 and
     # alpha1=alpha2=current alpha1.
-    parameters = IsotropicControlParameters().to_polaron_parameters(
-        nx=3,
-        ny=3,
-        eigensolver_tolerance=1.0e-12,
-    )
+    parameters = IsotropicControlParameters().to_polaron_parameters(nx=3, ny=3)
     interaction = density_density_control_interaction(
         parameters,
         onsite_u=0.525,
