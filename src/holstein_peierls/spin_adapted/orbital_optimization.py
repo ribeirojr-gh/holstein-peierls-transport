@@ -25,6 +25,14 @@ orbital frames. Every proposed quasi-Newton direction is transformed back to
 the current MO frame and projected onto the Miranda-allowed rotation space.
 A non-descent direction, bad curvature update, or failed line search causes a
 safe restart to the analytic steepest-descent generator.
+
+Very close to stationarity, the expected energy change is quadratic in an
+orbital gradient that can already be of order 1e-8. Such changes approach the
+floating-point resolution of an O(1 eV) total electronic energy. The optimizer
+therefore has a narrowly gated roundoff-floor mode: only near the requested
+gradient tolerance, an otherwise rejected step may be accepted if it lowers
+the orbital gradient while changing the energy by no more than a bound derived
+from machine epsilon. This does not relax the convergence criterion itself.
 """
 
 from __future__ import annotations
@@ -247,6 +255,48 @@ def _site_descent_generator(
     return generator_mo, np.asarray(generator_site, dtype=np.float64)
 
 
+def _roundoff_energy_slack(current_energy: float, candidate_energy: float) -> float:
+    """Return a conservative floating-point resolution bound for two energies."""
+    scale = max(1.0, abs(current_energy), abs(candidate_energy))
+    return 128.0 * np.finfo(np.float64).eps * scale
+
+
+def _max_orbital_gradient(
+    one_body: Matrix,
+    interaction: FloatArray,
+    orbitals: FloatArray,
+    shell_sizes: tuple[int, ...],
+    definition: OpenShellStateDefinition,
+) -> float:
+    generator = orbital_rotation_gradient(
+        one_body, interaction, orbitals, shell_sizes, definition
+    )
+    return float(np.max(np.abs(generator)))
+
+
+def _roundoff_floor_acceptance(
+    *,
+    current_energy: float,
+    candidate_energy: float,
+    current_max_gradient: float,
+    candidate_max_gradient: float,
+    gradient_tolerance: float,
+    gradient_window_factor: float,
+) -> bool:
+    """Accept a near-stationary step based on gradient reduction at energy floor.
+
+    This path is deliberately unavailable far from convergence. It never marks
+    a state converged by itself; it only permits another optimization step when
+    the energy change has become numerically unresolved.
+    """
+    if current_max_gradient > gradient_window_factor * gradient_tolerance:
+        return False
+    if not candidate_max_gradient < current_max_gradient:
+        return False
+    slack = _roundoff_energy_slack(current_energy, candidate_energy)
+    return candidate_energy <= current_energy + slack
+
+
 def optimize_open_shell_orbitals(
     one_body: Matrix,
     interaction: FloatArray,
@@ -265,6 +315,7 @@ def optimize_open_shell_orbitals(
     lbfgs_history_size: int = 8,
     armijo_constant: float = 1.0e-4,
     curvature_tolerance: float = 1.0e-10,
+    roundoff_gradient_window_factor: float = 32.0,
 ) -> OpenShellOrbitalResult:
     """Minimize the fixed-coefficient open-shell energy by orbital rotations.
 
@@ -274,6 +325,12 @@ def optimize_open_shell_orbitals(
     orbital orthonormality exactly. A failed quasi-Newton direction triggers a
     history reset and a steepest-descent retry, so the analytic variational
     descent remains the robustness baseline.
+
+    Near the requested gradient tolerance, energy differences can fall below
+    double-precision resolution. In that narrow regime the line search may use
+    strict gradient reduction plus a machine-epsilon energy bound instead of an
+    unresolvable Armijo decrease. The final convergence test remains solely the
+    requested orbital-gradient threshold.
     """
     if gradient_tolerance <= 0.0:
         raise ValueError("gradient_tolerance must be positive")
@@ -293,6 +350,8 @@ def optimize_open_shell_orbitals(
         raise ValueError("armijo_constant must lie between zero and one")
     if curvature_tolerance < 0.0:
         raise ValueError("curvature_tolerance must be non-negative")
+    if roundoff_gradient_window_factor <= 1.0:
+        raise ValueError("roundoff_gradient_window_factor must exceed one")
 
     c = _validate_orbitals(initial_orbitals)
     _validate_shell_sizes(c.shape[1], shell_sizes, definition)
@@ -307,6 +366,95 @@ def optimize_open_shell_orbitals(
     final_max_gradient = np.inf
     history: list[tuple[FloatArray, FloatArray, float]] = []
     iteration = 0
+
+    def try_direction(
+        proposed_mo: FloatArray,
+        proposed_site: FloatArray,
+        directional_derivative: float,
+        trial_step_start: float,
+        current_gradient_site: FloatArray,
+        current_max_gradient: float,
+        *,
+        allow_history_update: bool,
+    ) -> tuple[
+        bool,
+        FloatArray,
+        float,
+        float,
+        FloatArray | None,
+        FloatArray | None,
+        bool,
+    ]:
+        """Line-search one direction and return accepted state/gradient data."""
+        nonlocal rejected
+        trial_step = min(trial_step_start, maximum_step)
+        while trial_step >= minimum_step:
+            rotation = expm(trial_step * proposed_mo)
+            candidate = np.asarray(c @ rotation, dtype=np.float64)
+            candidate_energy = open_shell_orbital_energy(
+                one_body, interaction, candidate, shell_sizes, definition
+            )
+            armijo_bound = (
+                energy + armijo_constant * trial_step * directional_derivative
+            )
+            ordinary_acceptance = (
+                candidate_energy <= energy - energy_decrease_tolerance
+                and candidate_energy <= armijo_bound
+            )
+
+            candidate_descent_mo: FloatArray | None = None
+            candidate_descent_site: FloatArray | None = None
+            roundoff_acceptance = False
+            if not ordinary_acceptance and (
+                current_max_gradient
+                <= roundoff_gradient_window_factor * gradient_tolerance
+            ):
+                candidate_descent_mo, candidate_descent_site = (
+                    _site_descent_generator(
+                        one_body,
+                        interaction,
+                        candidate,
+                        shell_sizes,
+                        definition,
+                    )
+                )
+                candidate_max_gradient = float(
+                    np.max(np.abs(candidate_descent_mo))
+                )
+                roundoff_acceptance = _roundoff_floor_acceptance(
+                    current_energy=energy,
+                    candidate_energy=candidate_energy,
+                    current_max_gradient=current_max_gradient,
+                    candidate_max_gradient=candidate_max_gradient,
+                    gradient_tolerance=gradient_tolerance,
+                    gradient_window_factor=roundoff_gradient_window_factor,
+                )
+
+            if ordinary_acceptance or roundoff_acceptance:
+                if candidate_descent_mo is None or candidate_descent_site is None:
+                    candidate_descent_mo, candidate_descent_site = (
+                        _site_descent_generator(
+                            one_body,
+                            interaction,
+                            candidate,
+                            shell_sizes,
+                            definition,
+                        )
+                    )
+                return (
+                    True,
+                    candidate,
+                    candidate_energy,
+                    trial_step,
+                    candidate_descent_mo,
+                    candidate_descent_site,
+                    roundoff_acceptance,
+                )
+
+            trial_step *= shrink_factor
+            rejected += 1
+
+        return False, c, energy, trial_step, None, None, False
 
     for iteration in range(1, max_iterations + 1):
         descent_mo, descent_site = _site_descent_generator(
@@ -339,32 +487,40 @@ def optimize_open_shell_orbitals(
             proposed_site = c @ proposed_mo @ c.T
             proposed_site = 0.5 * (proposed_site - proposed_site.T)
 
-        trial_step = min(step, maximum_step)
-        accepted_this_iteration = False
-        while trial_step >= minimum_step:
-            rotation = expm(trial_step * proposed_mo)
-            candidate = np.asarray(c @ rotation, dtype=np.float64)
-            candidate_energy = open_shell_orbital_energy(
-                one_body, interaction, candidate, shell_sizes, definition
-            )
-            armijo_bound = (
-                energy + armijo_constant * trial_step * directional_derivative
-            )
-            enough_energy_drop = (
-                candidate_energy <= energy - energy_decrease_tolerance
-            )
-            if enough_energy_drop and candidate_energy <= armijo_bound:
-                old_gradient_site = gradient_site
-                old_direction_site = proposed_site
-                c = candidate
-                energy = candidate_energy
-                accepted += 1
-                accepted_this_iteration = True
+        (
+            accepted_this_iteration,
+            candidate,
+            candidate_energy,
+            trial_step,
+            new_descent_mo,
+            new_descent_site,
+            used_roundoff_acceptance,
+        ) = try_direction(
+            proposed_mo,
+            proposed_site,
+            directional_derivative,
+            step,
+            gradient_site,
+            final_max_gradient,
+            allow_history_update=not using_steepest_fallback,
+        )
 
-                new_descent_mo, new_descent_site = _site_descent_generator(
-                    one_body, interaction, c, shell_sizes, definition
-                )
-                new_gradient_site = -new_descent_site
+        if accepted_this_iteration:
+            assert new_descent_mo is not None
+            assert new_descent_site is not None
+            old_gradient_site = gradient_site
+            old_direction_site = proposed_site
+            c = candidate
+            energy = candidate_energy
+            accepted += 1
+            new_gradient_site = -new_descent_site
+
+            if used_roundoff_acceptance:
+                # The energy secant is at the arithmetic resolution floor, so
+                # do not contaminate the quasi-Newton curvature history with it.
+                history.clear()
+                step = min(max(trial_step, minimum_step) * growth_factor, initial_step)
+            else:
                 s_vec = trial_step * old_direction_site
                 y_vec = new_gradient_site - old_gradient_site
                 sy = _frobenius_inner(s_vec, y_vec)
@@ -382,46 +538,48 @@ def optimize_open_shell_orbitals(
                     if len(history) > lbfgs_history_size:
                         history.pop(0)
                 elif not using_steepest_fallback:
-                    # Bad curvature means the local inverse-Hessian model is
-                    # unreliable. Restart rather than accumulate noisy history.
                     history.clear()
-
                 step = min(trial_step * growth_factor, maximum_step)
-                break
-            trial_step *= shrink_factor
-            rejected += 1
+            continue
 
-        if not accepted_this_iteration and not using_steepest_fallback:
+        if not using_steepest_fallback:
             # Retry once with the guaranteed variational descent direction.
             history.clear()
             proposed_mo = descent_mo.copy()
+            proposed_site = descent_site.copy()
             directional_derivative = float(np.trace(descent_mo @ proposed_mo))
-            trial_step = min(initial_step, maximum_step)
-            while trial_step >= minimum_step:
-                rotation = expm(trial_step * proposed_mo)
-                candidate = np.asarray(c @ rotation, dtype=np.float64)
-                candidate_energy = open_shell_orbital_energy(
-                    one_body, interaction, candidate, shell_sizes, definition
-                )
-                armijo_bound = (
-                    energy + armijo_constant * trial_step * directional_derivative
-                )
-                if (
-                    candidate_energy <= energy - energy_decrease_tolerance
-                    and candidate_energy <= armijo_bound
-                ):
-                    c = candidate
-                    energy = candidate_energy
+            (
+                accepted_this_iteration,
+                candidate,
+                candidate_energy,
+                trial_step,
+                _,
+                _,
+                used_roundoff_acceptance,
+            ) = try_direction(
+                proposed_mo,
+                proposed_site,
+                directional_derivative,
+                initial_step,
+                gradient_site,
+                final_max_gradient,
+                allow_history_update=False,
+            )
+            if accepted_this_iteration:
+                c = candidate
+                energy = candidate_energy
+                accepted += 1
+                if used_roundoff_acceptance:
+                    step = min(
+                        max(trial_step, minimum_step) * growth_factor,
+                        initial_step,
+                    )
+                else:
                     step = min(trial_step * growth_factor, maximum_step)
-                    accepted += 1
-                    accepted_this_iteration = True
-                    break
-                trial_step *= shrink_factor
-                rejected += 1
+                continue
 
-        if not accepted_this_iteration:
-            step = trial_step
-            break
+        step = trial_step
+        break
 
     projectors = shell_projectors_from_complete_orbitals(c, shell_sizes, definition)
     final_gradient = orbital_rotation_gradient(
