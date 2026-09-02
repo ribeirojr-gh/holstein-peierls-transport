@@ -48,6 +48,7 @@ from .relaxation_control import (
     IsotropicRelaxationSeed,
     SpinRelaxationBranchResult,
     half_filled_n_closed,
+    harmonic_lattice_newton_direction,
     isotropic_relaxation_seed,
     relax_isotropic_spin_branch,
 )
@@ -74,6 +75,7 @@ __all__ = [
     "exchange_control_matrix",
     "general_open_shell_energy",
     "half_filled_n_closed",
+    "harmonic_lattice_newton_direction",
     "isotropic_relaxation_seed",
     "minimal_open_shell_coefficients",
     "open_shell_orbital_energy",
