@@ -15,17 +15,33 @@ from .open_shell import (
     general_open_shell_energy,
     shell_fock_matrices,
 )
+from .pair_control import (
+    ExchangeControl,
+    SpinAdaptedPairState,
+    StaticSpinAdaptedPairResult,
+    exchange_control_matrix,
+    relax_spin_adapted_pair,
+    singlet_triplet_gap,
+    solve_spin_adapted_pair,
+)
 from .spin import SpinMultiplicity, minimal_open_shell_coefficients, s2_eigenvalue
 
 __all__ = [
     "CLOSED_SHELL_SINGLET",
+    "ExchangeControl",
     "HIGH_SPIN_TRIPLET",
     "OPEN_SHELL_SINGLET",
     "IsotropicControlParameters",
     "OpenShellStateDefinition",
+    "SpinAdaptedPairState",
     "SpinMultiplicity",
+    "StaticSpinAdaptedPairResult",
+    "exchange_control_matrix",
     "general_open_shell_energy",
     "minimal_open_shell_coefficients",
+    "relax_spin_adapted_pair",
     "s2_eigenvalue",
     "shell_fock_matrices",
+    "singlet_triplet_gap",
+    "solve_spin_adapted_pair",
 ]
