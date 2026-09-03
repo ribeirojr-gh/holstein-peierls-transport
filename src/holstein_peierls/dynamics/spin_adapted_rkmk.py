@@ -23,7 +23,9 @@ accuracy without any post-step repair.
 
 The dense matrix exponential used here is intentionally a D0b reference
 implementation for small spin-adapted controls.  A later production backend may
-replace the exponential action without changing the RKMK equations.
+replace the exponential action without changing the RKMK equations.  The two
+small Lie-algebra helpers are public because D1 reuses the identical manifold
+geometry with an explicitly time-dependent one-body Hamiltonian.
 """
 
 from __future__ import annotations
@@ -49,7 +51,7 @@ def _commutator(left: ComplexArray, right: ComplexArray) -> ComplexArray:
     return np.asarray(left @ right - right @ left, dtype=np.complex128)
 
 
-def _dexp_inverse_fourth_order(
+def dexp_inverse_fourth_order(
     omega: ComplexArray,
     generator: ComplexArray,
 ) -> ComplexArray:
@@ -60,10 +62,11 @@ def _dexp_inverse_fourth_order(
     return np.asarray(0.5 * (result - result.conj().T), dtype=np.complex128)
 
 
-def _apply_algebra_coordinate(
+def apply_algebra_coordinate(
     projectors: Sequence[ComplexArray],
     omega: ComplexArray,
 ) -> tuple[ComplexArray, ...]:
+    """Apply one common unitary algebra coordinate to all shell projectors."""
     if np.linalg.norm(omega) == 0.0:
         return tuple(np.asarray(p, dtype=np.complex128) for p in projectors)
     unitary = expm(omega)
@@ -80,14 +83,14 @@ def _algebra_rhs(
     definition: OpenShellStateDefinition,
     omega: ComplexArray,
 ) -> ComplexArray:
-    current = _apply_algebra_coordinate(base_projectors, omega)
+    current = apply_algebra_coordinate(base_projectors, omega)
     generator = variational_generator(
         one_body,
         interaction,
         current,
         definition,
     )
-    return _dexp_inverse_fourth_order(omega, generator)
+    return dexp_inverse_fourth_order(omega, generator)
 
 
 def rkmk4_projector_step(
@@ -112,7 +115,7 @@ def rkmk4_projector_step(
     k4 = _algebra_rhs(one_body, interaction, ps, definition, dt * k3)
     omega = (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
     omega = np.asarray(0.5 * (omega - omega.conj().T), dtype=np.complex128)
-    return _apply_algebra_coordinate(ps, omega)
+    return apply_algebra_coordinate(ps, omega)
 
 
 def integrate_rkmk4_projectors(

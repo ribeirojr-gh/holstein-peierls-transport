@@ -28,6 +28,11 @@ class RPropDiagnostics:
     final_max_delta_vx: float
     final_max_delta_vy: float
 
+    @property
+    def converged(self) -> bool:
+        """Return whether all three lattice-coordinate families converged."""
+        return self.converged_u and self.converged_vx and self.converged_vy
+
 
 @dataclass(frozen=True, slots=True)
 class RPropOutput:
