@@ -33,8 +33,18 @@ jobs:
             --reference-max-step-fs 0.02 \
             --output benchmark/d2-coupled.json \
             --markdown benchmark/d2-coupled.md
+      - name: Run 10 ps CF4-Lanczos stability trajectory
+        run: |
+          python experiments/d2_long_stability.py \
+            --size 20 \
+            --final-time-fs 10000.0 \
+            --dt-fs 0.2 \
+            --kick-velocity-a-per-fs 2.0e-4 \
+            --krylov-dimension 6 \
+            --output benchmark/d2-long-stability.json \
+            --markdown benchmark/d2-long-stability.md
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: d2-coupled-zero-temperature
-          path: benchmark/d2-coupled.*
+          path: benchmark/d2-*
