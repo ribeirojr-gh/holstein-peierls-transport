@@ -5,8 +5,8 @@ makes the one-particle Hamiltonian explicitly time dependent,
 
     d psi / dt = -(i / hbar) H(t) psi.
 
-The high-accuracy reference is adaptive DOP853.  Fixed-step RK4 remains a
-transparent baseline.  The main exponential candidate is the standard
+The high-accuracy reference is adaptive DOP853. Fixed-step RK4 remains a
+transparent baseline. The main exponential candidate is the standard
 symmetric two-exponential fourth-order commutator-free Magnus method evaluated
 at the two Gauss-Legendre nodes, with each exponential action evaluated by the
 validated D0a Lanczos kernel.
@@ -21,6 +21,7 @@ from typing import Any, Callable
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.integrate import solve_ivp
+from scipy.sparse import issparse
 
 from .frozen import (
     HBAR_EV_FS,
@@ -76,11 +77,18 @@ def _matrix_at(
     matrix = hamiltonian_at(float(time_fs))
     if not hasattr(matrix, "shape") or matrix.shape != (dimension, dimension):
         raise ValueError("time-dependent Hamiltonian has the wrong shape")
-    # Dense conversion is used only for the inexpensive Hermiticity gate.  D1
-    # benchmark cells are deliberately small; production sparse actions can
-    # later replace this validation with a cheaper structural guarantee.
-    dense = matrix.toarray() if hasattr(matrix, "toarray") else np.asarray(matrix)
-    dense = np.asarray(dense, dtype=np.complex128)
+
+    if issparse(matrix):
+        if not np.all(np.isfinite(matrix.data)):
+            raise ValueError("Hamiltonian must contain only finite values")
+        difference = matrix - matrix.getH()
+        if difference.nnz:
+            maximum_error = float(np.max(np.abs(difference.data)))
+            if maximum_error > 1.0e-12:
+                raise ValueError("time-dependent Hamiltonian must be Hermitian")
+        return matrix
+
+    dense = np.asarray(matrix, dtype=np.complex128)
     if not np.all(np.isfinite(dense)):
         raise ValueError("Hamiltonian must contain only finite values")
     if not np.allclose(dense, dense.conj().T, rtol=0.0, atol=1.0e-12):
@@ -179,7 +187,7 @@ def cfm4_lanczos_step(
         exp[-i dt (a1 H1 + a2 H2)/hbar]
         exp[-i dt (a2 H1 + a1 H2)/hbar].
 
-    The rightmost exponential acts first.  For constant H both weighted
+    The rightmost exponential acts first. For constant H both weighted
     Hamiltonians reduce to H/2, exactly recovering the D0a frozen CF4 limit.
     """
     psi = _state_vector(state)
