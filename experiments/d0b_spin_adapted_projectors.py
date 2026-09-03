@@ -1,17 +1,19 @@
 """D0b frozen-geometry benchmark for the spin-adapted projector equations.
 
 The benchmark starts from the same 4x4 checkerboard-gapped isotropic control used
-by S0.  For each multiplicity, the state-specific open-shell orbitals are first
-converged at the frozen geometry.  A small allowed occupied-virtual orbital
+by S0. For each multiplicity, the state-specific open-shell orbitals are first
+converged at the frozen geometry. A small allowed occupied-virtual orbital
 rotation then moves the electronic state away from the stationary solution
-without changing the lattice.  The resulting nonlinear electronic motion is
+without changing the lattice. The resulting nonlinear electronic motion is
 compared between:
 
 - a tight adaptive DOP853 reference;
 - a looser adaptive DOP853 control;
 - fixed-step RK4;
-- a structure-preserving predictor exponential midpoint update; and
-- fourth-order Runge-Kutta-Munthe-Kaas (RKMK4).
+- a structure-preserving predictor exponential midpoint control; and
+- fourth-order Runge-Kutta-Munthe-Kaas (RKMK4), which evolves on the
+  anti-Hermitian Lie algebra and preserves the projector manifold by
+  construction.
 
 No lattice motion, field, thermostat, or post-step projector repair is used.
 """
