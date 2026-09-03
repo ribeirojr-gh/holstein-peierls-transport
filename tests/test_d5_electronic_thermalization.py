@@ -55,7 +55,12 @@ def test_uniform_distribution_is_exact_infinite_temperature_control():
     uniform = np.full(energies.size, 1.0 / energies.size)
     target = distribution_energy_eV(energies, uniform)
     assert effective_inverse_temperature_eV_inv(energies, target) == 0.0
-    assert occupation_participation_number(uniform) == float(energies.size)
+    assert np.isclose(
+        occupation_participation_number(uniform),
+        float(energies.size),
+        rtol=0.0,
+        atol=2.0e-15,
+    )
     assert np.isclose(occupation_entropy(uniform), np.log(energies.size))
 
 
