@@ -23,7 +23,6 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .electronic import GroundState, SolverName, solve_ground_state
-from .hamiltonian import bond_transfer_integrals
 from .lattice import LatticeState
 from .parameters import StaticPolaronParameters
 
@@ -252,13 +251,16 @@ def frozen_translation_profile(
     direction: Direction = "+x",
     image_count: int = 11,
     solver: SolverName = "sparse",
+    source_site: int | None = None,
 ) -> FrozenTranslationProfile:
     """Return the adiabatic electronic energy along a frozen lattice path.
 
     ``relaxed_state`` is treated as the source endpoint.  The target endpoint is
     an exact one-site translation of the same lattice distortion.  Classical
     coordinates are linearly interpolated; only the electronic ground state is
-    relaxed at each image.
+    relaxed at each image.  ``source_site`` may be supplied from the actual
+    relaxed charge-density maximum, which is safer than assuming that a
+    translationally degenerate solver remained on the seeded site.
     """
     relaxed_state.validate()
     if relaxed_state.shape != (parameters.ny, parameters.nx):
@@ -267,7 +269,9 @@ def frozen_translation_profile(
     if count < 3 or count % 2 == 0:
         raise ValueError("image_count must be an odd integer >= 3")
 
-    source = parameters.polaron_index
+    source = parameters.polaron_index if source_site is None else int(source_site)
+    if not 0 <= source < parameters.n_sites:
+        raise ValueError("source_site is outside the lattice")
     target = translated_site_index(source, parameters, direction)
     translated = translate_lattice_state(relaxed_state, direction)
     fractions = np.linspace(0.0, 1.0, count)
