@@ -6,13 +6,15 @@ IP1c numerically closed and showed three robust features around persistent neare
 
 Two methodological limitations remain before a causal dressed-hopping interpretation is defensible.
 
-First, the commonly quoted 0.25 reference for the strongest of four bonds is only a naive symmetry baseline.  Samples within one trajectory are correlated and the future direction is selected by the coupled dynamics.  Each real event therefore needs a matched counterfactual comparison against the three alternative nearest-neighbour targets at the same source and time.
+First, the commonly quoted 0.25 reference for the strongest of four bonds is only a naive symmetry baseline. Samples within one trajectory are correlated and the future direction is selected by the coupled dynamics. Each real event therefore needs a matched counterfactual comparison against the three alternative nearest-neighbour targets at the same source and time.
 
-Second, IP1c stored the first negative-to-nonnegative lattice-coordinate crossing in the full +/-500 fs window.  Thermal fluctuations can cross zero repeatedly, so that quantity is not a reliable causal lag.  IP1d uses the crossing closest to the electronic transition and reports source/target template signal strength explicitly.
+Second, IP1c stored the first negative-to-nonnegative lattice-coordinate crossing in the full +/-500 fs window. Thermal fluctuations can cross zero repeatedly, so that quantity is not a reliable causal lag. IP1d uses the crossing closest to the electronic transition and reports source/target template signal strength explicitly.
+
+A third protocol issue was added before execution: dynamic lattice excitations can wrap around a finite periodic cell and later interact with the carrier. IP1p now audits this recurrence scale explicitly. For the current K2 and M2, the maximum undamped intermolecular group velocity is about 1.844 sites/ps, giving a stationary-carrier full-wrap scale of about 10.85 ps on a 20-site direction. The 20 ps trajectories used in IP1a–IP1c therefore extend beyond this conservative lattice recurrence scale. IP1d is shortened because it is a local mechanism test, not a kinetic-rate calculation.
 
 ## Frozen dynamics
 
-The dynamics are intentionally unchanged from IP1c:
+The local dynamics remain the same as IP1c except for the recurrence-guarded production length:
 
 - one-polaron Holstein-Peierls model;
 - 20x20 PBC;
@@ -25,8 +27,12 @@ The dynamics are intentionally unchanged from IP1c:
 - IDC-BM, td=180 fs as a numerical control, not a material calibration;
 - 2 fs diagnostic sampling;
 - 50 fs electronic residence persistence;
-- 20 ps total trajectory, 2 ps burn-in;
+- **10 ps total trajectory, 2 ps burn-in**;
 - four independent lattice/decoherence seed pairs per condition.
+
+With a +/-500 fs event window, complete event records end no later than 9.5 ps, before the approximately 10.85 ps stationary-carrier undamped wrap scale. This does not prove that a moving carrier cannot experience an earlier finite-size interaction; it is a conservative practical guard. Before any long-time rate, diffusion coefficient, or mobility is extracted, a larger-cell and damping-sensitivity study is required.
+
+The present gamma_v=0.01 fs^-1 also overdamps all non-zero harmonic intermolecular modes in the linear limit because gamma_v > 2 omega_max. This strongly suppresses coherent ballistic phonon recurrence, but gamma is a numerical bath parameter rather than a calibrated material phonon lifetime. The damping must therefore not be used as the sole physical justification for ignoring phonon memory.
 
 Conditions remain isotropic J0y/J0x=1 at 100, 300 and 500 K plus the anisotropic J0y/J0x=0.15 mobile control at 300 K.
 
@@ -36,13 +42,13 @@ For every accepted electronic nearest-neighbour event from source i in true dire
 
 j_d = i + d,  d in {+x,-x,+y,-y}.
 
-All diagnostics are evaluated for all four candidates using the same trajectory frames.  The three directions d != d* are counterfactuals: what would the lattice/current precursor have looked like had the electron moved to another neighbour?
+All diagnostics are evaluated for all four candidates using the same trajectory frames. The three directions d != d* are counterfactuals: what would the lattice/current precursor have looked like had the electron moved to another neighbour?
 
 For any directional scalar X_d define
 
 Delta X_match = X_d* - mean_{d != d*} X_d.
 
-The true direction is also assigned a rank among all four candidates.  These matched quantities, rather than a frame-count null of 0.25, are the primary IP1d mechanistic controls.
+The true direction is also assigned a rank among all four candidates. These matched quantities, rather than a frame-count null of 0.25, are the primary IP1d mechanistic controls.
 
 ## Lattice source-target response
 
@@ -50,7 +56,7 @@ The same static-template coordinate as IP1c is used for every candidate neighbou
 
 Q_L,d(t) = [A_{j_d}(t)-A_i(t)] / [|A_{j_d}(t)|+|A_i(t)|].
 
-Pre and post means remain [-500,-100] fs and [+100,+500] fs.  For every direction record
+Pre and post means remain [-500,-100] fs and [+100,+500] fs. For every direction record
 
 Delta Q_L,d = <Q_L,d>_post - <Q_L,d>_pre.
 
@@ -62,15 +68,15 @@ Primary matched lattice diagnostics are
 - true-target rank among four candidate Delta Q_L values;
 - fraction of events in which the true target has the largest Delta Q_L.
 
-The absolute template signal D_d(t)=|A_i|+|A_{j_d}| is also recorded.  This distinguishes a real loss of lattice following at high temperature from a loss of static-template signal-to-background.
+The absolute template signal D_d(t)=|A_i|+|A_{j_d}| is also recorded. This distinguishes a real loss of lattice following at high temperature from a loss of static-template signal-to-background.
 
 ## Crossing lag
 
-All negative-to-nonnegative crossings of Q_L,true are detected by linear interpolation.  The reported event lag is the crossing nearest t=0, not the first crossing in the full event window.  A near-event reversal diagnostic also uses local pre/post means away from the transition core; it remains a physical diagnostic, never a numerical gate.
+All negative-to-nonnegative crossings of Q_L,true are detected by linear interpolation. The reported event lag is the crossing nearest t=0, not the first crossing in the full event window. A near-event reversal diagnostic also uses local pre/post means away from the transition core; it remains a physical diagnostic, never a numerical gate.
 
 ## Long-lag transfer precursor
 
-The local transfer magnitudes around the still-confirmed source site are analyzed farther back in time than IP1c.  Bins are
+The local transfer magnitudes around the still-confirmed source site are analyzed farther back in time than IP1c. Bins are
 
 - [-500,-400] fs,
 - [-400,-300] fs,
@@ -96,15 +102,15 @@ A precursor is more convincing if the matched advantage becomes positive before 
 
 ## TP1 current matched control
 
-The same PBC-safe TP1 integrated displacement is measured over +/-100, +/-250 and +/-500 fs.  The displacement vector is projected onto all four candidate directions.  The accepted direction is compared with the other three by matched advantage and rank.
+The same PBC-safe TP1 integrated displacement is measured over +/-100, +/-250 and +/-500 fs. The displacement vector is projected onto all four candidate directions. The accepted direction is compared with the other three by matched advantage and rank.
 
 This is primarily a detector/continuity control: the density relocation and bond current are not statistically independent observables.
 
 ## Statistics
 
-Frame and event samples are temporally correlated.  IP1d therefore reports both pooled descriptive diagnostics and seed-level summaries.  Student-t intervals across the four independent seeds are screening intervals only; no precision population parameter is claimed from N=4.
+Frame and event samples are temporally correlated. IP1d therefore reports both pooled descriptive diagnostics and seed-level summaries. Student-t intervals across the four independent seeds are screening intervals only; no precision population parameter is claimed from N=4.
 
-No physical threshold is frozen in IP1d.  In particular, no event is labeled a `dressed hop` solely because it satisfies one arbitrary Delta Q_L or template-correlation cutoff.  The matched-null distributions will determine whether a defensible continuous score or threshold exists for a later kinetic stage.
+No physical threshold is frozen in IP1d. In particular, no event is labeled a `dressed hop` solely because it satisfies one arbitrary Delta Q_L or template-correlation cutoff. The matched-null distributions will determine whether a defensible continuous score or threshold exists for a later kinetic stage.
 
 ## Numerical gates
 
@@ -119,10 +125,11 @@ Numerical PASS requires:
 7. projected zero modes <1e-12;
 8. static template self-correlation is unity to 1e-10;
 9. all produced matched diagnostics are finite;
-10. every complete event has exactly four periodic candidate neighbour directions and the true target matches the accepted electronic event.
+10. every complete event has exactly four periodic candidate neighbour directions and the true target matches the accepted electronic event;
+11. the IP1p preflight confirms that the planned 10 ps run and all complete +/-500 fs event windows end before the stationary-carrier undamped full-wrap scale.
 
 No nonzero event count, target advantage, crossing fraction, current fraction, or bond-predictability value is a numerical PASS gate.
 
 ## Interpretation rule
 
-IP1d may establish direction-specific structural precursor evidence, but it still does not infer an activation energy, diffusion coefficient or mobility.  Kinetics begin only after the event population is physically defined and its sensitivity to IDC/decoherence controls is checked.
+IP1d may establish direction-specific structural precursor evidence, but it still does not infer an activation energy, diffusion coefficient or mobility. Kinetics begin only after the event population is physically defined and its sensitivity to IDC/decoherence controls, lattice size, and Langevin damping is checked.
