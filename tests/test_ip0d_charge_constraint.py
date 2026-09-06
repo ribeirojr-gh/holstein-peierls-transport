@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import numpy as np
+import pytest
 
 from holstein_peierls.electronic import solve_ground_state
 from holstein_peierls.energy import lattice_energy
@@ -21,7 +22,16 @@ from holstein_peierls.translation_charge_constraint import (
 )
 
 
-def _relaxed_case(*, ratio: float = 1.0):
+def _relaxed_case(*, ratio: float = 0.5):
+    """Return a small, localized test fixture with distinguishable endpoints.
+
+    A 4x4 fully isotropic control is deliberately *not* used as the default
+    fixture.  At this size the relaxed isotropic ground state can be essentially
+    translation invariant, so a charge-cloud order parameter between one-site
+    translated copies is undefined.  The production IP0d benchmark uses 20x20,
+    where the isotropic polaron is localized enough for the endpoint charge
+    clouds to be distinguishable.
+    """
     parameters = StaticPolaronParameters(nx=4, ny=4, polaron_position=11)
     parameters = replace(parameters, j0y=parameters.j0x * ratio)
     result = solve_static_polaron(
@@ -35,13 +45,23 @@ def _relaxed_case(*, ratio: float = 1.0):
 
 
 def test_translation_charge_order_parameter_has_unit_endpoint_coordinates() -> None:
-    parameters, state = _relaxed_case(ratio=1.0)
+    parameters, state = _relaxed_case(ratio=0.5)
     order = translation_charge_order_parameter(
         state, parameters, "+x", solver="dense_lowest"
     )
     assert np.isclose(order.start_expectation - order.offset, 1.0, atol=1.0e-11)
     assert np.isclose(order.end_expectation - order.offset, -1.0, atol=1.0e-11)
     assert np.isclose(order.start_expectation - order.end_expectation, 2.0, atol=1.0e-11)
+
+
+def test_translation_charge_order_parameter_rejects_indistinguishable_endpoints() -> None:
+    parameters, state = _relaxed_case(ratio=1.0)
+    with pytest.raises(
+        ValueError, match="translated endpoint charge densities are not distinguishable"
+    ):
+        translation_charge_order_parameter(
+            state, parameters, "+x", solver="dense_lowest"
+        )
 
 
 def test_natural_endpoint_constraint_needs_zero_bias() -> None:
@@ -63,7 +83,7 @@ def test_natural_endpoint_constraint_needs_zero_bias() -> None:
 
 
 def test_midpoint_constraint_hits_full_charge_order_target() -> None:
-    parameters, state = _relaxed_case(ratio=1.0)
+    parameters, state = _relaxed_case(ratio=0.5)
     translated = translate_lattice_state(state, "+x")
     midpoint = interpolate_lattice_states(state, translated, 0.5)
     order = translation_charge_order_parameter(
@@ -101,7 +121,7 @@ def test_constrained_physical_energy_is_not_below_adiabatic_ground_state() -> No
 
 
 def test_biased_eigenvalue_identity_removes_constraint_bias() -> None:
-    parameters, state = _relaxed_case(ratio=1.0)
+    parameters, state = _relaxed_case(ratio=0.5)
     translated = translate_lattice_state(state, "+x")
     lattice = interpolate_lattice_states(state, translated, 0.25)
     order = translation_charge_order_parameter(
