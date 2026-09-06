@@ -3,6 +3,10 @@
 
 The runner avoids hosted GitHub Actions and records a self-contained artifact.
 Physical precursor strengths are never promoted to numerical PASS gates.
+
+A phonon-recurrence preflight is run first.  The IP1d trajectory is limited to
+10 ps on the 20x20 cell so its complete +/-500 fs event windows end before the
+stationary-carrier undamped full-wrap scale identified by IP1p.
 """
 
 from __future__ import annotations
@@ -75,6 +79,8 @@ def main() -> None:
                 "-m",
                 "py_compile",
                 "src/holstein_peierls/dynamics/matched_precursors.py",
+                "src/holstein_peierls/dynamics/phonon_recurrence.py",
+                "experiments/ip1p_phonon_recurrence_audit.py",
                 "experiments/ip1d_matched_counterfactual_precursors.py",
             ],
             output_dir,
@@ -87,6 +93,7 @@ def main() -> None:
                 python,
                 "-m",
                 "pytest",
+                "tests/test_ip1p_phonon_recurrence.py",
                 "tests/test_ip1d_matched_precursors.py",
                 "tests/test_ip1c_event_conditioned_hopping.py",
                 "tests/test_ip1b_dressed_hopping.py",
@@ -101,6 +108,35 @@ def main() -> None:
         )
     )
     gates.append(_run("full-pytest", [python, "-m", "pytest"], output_dir))
+
+    recurrence_artifact = output_dir / "ip1p-phonon-recurrence-audit.json"
+    recurrence_markdown = output_dir / "ip1p-phonon-recurrence-audit.md"
+    gates.append(
+        _run(
+            "ip1p-phonon-recurrence-preflight",
+            [
+                python,
+                "experiments/ip1p_phonon_recurrence_audit.py",
+                "--nx",
+                "20",
+                "--ny",
+                "20",
+                "--lattice-spacing-A",
+                "3.0",
+                "--gamma-v-per-fs",
+                "0.01",
+                "--event-half-window-fs",
+                "500",
+                "--planned-final-time-fs",
+                "10000",
+                "--output",
+                str(recurrence_artifact),
+                "--markdown",
+                str(recurrence_markdown),
+            ],
+            output_dir,
+        )
+    )
 
     artifact = output_dir / "ip1d-matched-counterfactual-precursors.json"
     markdown = output_dir / "ip1d-matched-counterfactual-precursors.md"
@@ -125,7 +161,7 @@ def main() -> None:
                 "--dt-fs",
                 "0.2",
                 "--final-time-fs",
-                "20000",
+                "10000",
                 "--burn-in-fs",
                 "2000",
                 "--sample-interval-fs",
@@ -151,6 +187,11 @@ def main() -> None:
     )
 
     payload = json.loads(artifact.read_text(encoding="utf-8")) if artifact.exists() else None
+    recurrence = (
+        json.loads(recurrence_artifact.read_text(encoding="utf-8"))
+        if recurrence_artifact.exists()
+        else None
+    )
     metadata = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "git_commit": _git_value(["rev-parse", "HEAD"]),
@@ -166,14 +207,23 @@ def main() -> None:
             key: os.environ.get(key, "unset")
             for key in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
         },
-        "scope": "IP1d zero-field 20x20 matched counterfactual precursor validation; same dynamics as IP1c; no mobility/diffusion/activation claim",
+        "scope": "IP1d zero-field 20x20 matched counterfactual precursor validation; 10 ps PBC-recurrence-guarded mechanistic window; no mobility/diffusion/activation claim",
     }
     failed = [gate["name"] for gate in gates if gate["status"] != "pass"]
+    recurrence_guard_ok = bool(
+        recurrence is not None
+        and recurrence["planned_run_finishes_before_stationary_wrap"]
+        and recurrence["planned_complete_event_windows_finish_before_stationary_wrap"]
+    )
+    if not recurrence_guard_ok:
+        failed.append("phonon-recurrence-window-guard")
     summary = {
         "metadata": metadata,
         "overall_status": "pass" if not failed else "fail",
         "failed_gates": failed,
         "gates": gates,
+        "phonon_recurrence_audit": recurrence,
+        "phonon_recurrence_guard_pass": recurrence_guard_ok,
         "ip1d_artifact": str(artifact) if artifact.exists() else None,
         "ip1d_numerical_pass": bool(payload["numerical_pass"]) if payload is not None else False,
         "ip1d_numerical_checks": payload["numerical_checks"] if payload is not None else None,
@@ -195,6 +245,7 @@ def main() -> None:
     print(f"Overall runner status: {summary['overall_status'].upper()}")
     if payload is not None:
         print(f"IP1d numerical status: {'PASS' if payload['numerical_pass'] else 'FAIL'}")
+    print(f"Phonon recurrence guard: {'PASS' if recurrence_guard_ok else 'FAIL'}")
 
     if failed or payload is None or not payload["numerical_pass"]:
         raise SystemExit(2)
