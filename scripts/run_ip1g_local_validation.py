@@ -44,7 +44,11 @@ def _run(name: str, command: list[str], output_dir: Path) -> dict:
 
 def _git(command: list[str]) -> str:
     result = subprocess.run(
-        ["git", *command], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=False
+        ["git", *command],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        check=False,
     )
     return result.stdout.strip() if result.returncode == 0 else "unknown"
 
@@ -118,48 +122,62 @@ def main() -> None:
         )
     )
 
+    recurrence = (
+        json.loads(recurrence_json.read_text(encoding="utf-8"))
+        if recurrence_json.exists()
+        else None
+    )
+    recurrence_pass = bool(
+        recurrence is not None
+        and recurrence.get("planned_run_finishes_before_stationary_wrap", False)
+    )
+
     result_json = output_dir / "ip1g-single-relocation-wake.json"
     result_md = output_dir / "ip1g-single-relocation-wake.md"
     profiles = output_dir / "ip1g-single-relocation-wake-profiles.npz"
-    gates.append(
-        _run(
-            "ip1g-single-relocation-wake-benchmark",
-            [
-                python,
-                "experiments/ip1g_single_relocation_wake.py",
-                "--size",
-                "40",
-                "--ratios",
-                "1.0",
-                "0.15",
-                "--dt-fs",
-                "0.2",
-                "--final-time-fs",
-                "5000",
-                "--sample-interval-fs",
-                "2.0",
-                "--krylov-dimension",
-                "6",
-                "--output",
-                str(result_json),
-                "--markdown",
-                str(result_md),
-                "--profiles",
-                str(profiles),
-            ],
-            output_dir,
+    if recurrence_pass and all(gate["status"] == "pass" for gate in gates):
+        gates.append(
+            _run(
+                "ip1g-single-relocation-wake-benchmark",
+                [
+                    python,
+                    "experiments/ip1g_single_relocation_wake.py",
+                    "--size",
+                    "40",
+                    "--ratios",
+                    "1.0",
+                    "0.15",
+                    "--dt-fs",
+                    "0.2",
+                    "--final-time-fs",
+                    "5000",
+                    "--sample-interval-fs",
+                    "2.0",
+                    "--krylov-dimension",
+                    "6",
+                    "--output",
+                    str(result_json),
+                    "--markdown",
+                    str(result_md),
+                    "--profiles",
+                    str(profiles),
+                ],
+                output_dir,
+            )
         )
-    )
 
-    payload = json.loads(result_json.read_text(encoding="utf-8")) if result_json.exists() else None
-    recurrence = json.loads(recurrence_json.read_text(encoding="utf-8")) if recurrence_json.exists() else None
+    payload = (
+        json.loads(result_json.read_text(encoding="utf-8"))
+        if result_json.exists()
+        else None
+    )
     failed = [gate["name"] for gate in gates if gate["status"] != "pass"]
+    numerical_pass = bool(payload is not None and payload.get("numerical_pass", False))
     overall = bool(
         not failed
-        and payload is not None
-        and payload.get("numerical_pass", False)
-        and recurrence is not None
-        and recurrence.get("overall_pass", False)
+        and recurrence_pass
+        and numerical_pass
+        and profiles.exists()
     )
     summary = {
         "metadata": {
@@ -182,15 +200,18 @@ def main() -> None:
         "overall_status": "pass" if overall else "fail",
         "failed_gates": failed,
         "gates": gates,
-        "recurrence_preflight_pass": bool(recurrence.get("overall_pass", False)) if recurrence else False,
+        "recurrence_preflight_pass": recurrence_pass,
         "ip1g_artifact": str(result_json) if result_json.exists() else None,
         "ip1g_profiles": str(profiles) if profiles.exists() else None,
-        "ip1g_numerical_pass": bool(payload.get("numerical_pass", False)) if payload else False,
+        "ip1g_numerical_pass": numerical_pass,
         "ip1g_numerical_checks": payload.get("numerical_checks") if payload else None,
     }
     (output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(f"\nValidation artifact: {output_dir}")
     print(f"Overall IP1g status: {summary['overall_status'].upper()}")
+    print(f"Recurrence preflight: {'PASS' if recurrence_pass else 'FAIL'}")
+    if payload is not None:
+        print(f"IP1g numerical status: {'PASS' if numerical_pass else 'FAIL'}")
     if not overall:
         raise SystemExit(2)
 
