@@ -165,13 +165,26 @@ def intermolecular_energy_flux(
     )
 
 
-def _minimum_image_axis(length: int, origin: int) -> NDArray[np.int64]:
-    if length < 3:
+def _canonical_periodic_coordinate(
+    values: NDArray[np.integer] | int,
+    length: int,
+) -> NDArray[np.int64]:
+    """Map periodic integer coordinates to one canonical minimum-image range.
+
+    For even lengths the antipodal point has two equivalent signed
+    representations.  We choose ``-L/2`` rather than ``+L/2`` so that a
+    direction reversal cannot create an extra longitudinal profile bin.
+    """
+    if int(length) < 3:
         raise ValueError("periodic axis length must be at least three")
+    array = np.asarray(values, dtype=np.int64)
+    half = int(length) // 2
+    return np.asarray(((array + half) % int(length)) - half, dtype=np.int64)
+
+
+def _minimum_image_axis(length: int, origin: int) -> NDArray[np.int64]:
     values = np.arange(length, dtype=np.int64) - int(origin)
-    half = length // 2
-    values = ((values + half) % length) - half
-    return np.asarray(values, dtype=np.int64)
+    return _canonical_periodic_coordinate(values, length)
 
 
 def event_aligned_coordinates(
@@ -180,7 +193,14 @@ def event_aligned_coordinates(
     nx: int,
     ny: int,
 ) -> EventAlignedCoordinates:
-    """Return signed minimum-image coordinates with the hop pointing to +s."""
+    """Return signed minimum-image coordinates with the hop pointing to +s.
+
+    The post-rotation canonicalization is essential for even cells.  Without
+    it, a -x or -y hop maps the unique antipodal ``-L/2`` site to ``+L/2``;
+    ``np.bincount`` then creates ``L+1`` bins while the declared axis has only
+    ``L`` entries.  Re-wrapping after the event rotation keeps all four hop
+    directions on the same PBC-safe coordinate convention.
+    """
     step = periodic_nearest_neighbor_step(source_site, target_site, nx, ny)
     if step is None:
         raise ValueError("event-aligned coordinates require a nearest-neighbour hop")
@@ -190,15 +210,20 @@ def event_aligned_coordinates(
     dy_axis = _minimum_image_axis(ny, sy)
     dx_grid = np.broadcast_to(dx_axis[None, :], (ny, nx))
     dy_grid = np.broadcast_to(dy_axis[:, None], (ny, nx))
-    s = dx_grid * int(dx_hop) + dy_grid * int(dy_hop)
-    p = -dx_grid * int(dy_hop) + dy_grid * int(dx_hop)
-    length = nx if dx_hop != 0 else ny
+
+    raw_s = dx_grid * int(dx_hop) + dy_grid * int(dy_hop)
+    raw_p = -dx_grid * int(dy_hop) + dy_grid * int(dx_hop)
+    longitudinal_length = nx if dx_hop != 0 else ny
+    transverse_length = ny if dx_hop != 0 else nx
+    s = _canonical_periodic_coordinate(raw_s, longitudinal_length)
+    p = _canonical_periodic_coordinate(raw_p, transverse_length)
+
     return EventAlignedCoordinates(
         np.asarray(s, dtype=np.int64),
         np.asarray(p, dtype=np.int64),
         int(dx_hop),
         int(dy_hop),
-        int(length),
+        int(longitudinal_length),
     )
 
 
@@ -227,11 +252,15 @@ def longitudinal_profile(
         dtype=np.int64,
     )
     bins = s_values - s_min
+    if np.any(bins < 0) or np.any(bins >= coordinates.longitudinal_length):
+        raise ValueError("event-aligned longitudinal coordinate escaped canonical PBC range")
     profile = np.bincount(
         bins,
         weights=weights,
         minlength=coordinates.longitudinal_length,
     )
+    if profile.size != coordinates.longitudinal_length:
+        raise RuntimeError("longitudinal profile length does not match periodic axis")
     return s_axis, np.asarray(profile, dtype=np.float64)
 
 
