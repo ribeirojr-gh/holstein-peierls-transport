@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Self-contained local runner for IP1s energy-preserving Peierls direction-reversal control.
-# The isotropic 40x40 system is driven until the first natural x hop is accepted,
-# then two zero-power fully coupled branches are compared: native released and a
-# counterfactual with all non-special vx traveling directions reversed at fixed
-# coordinates and fixed total energy. No prior artifact ZIP is required.
+# Self-contained local runner for IP1t post-recrossing Peierls direction control.
+# The isotropic 40x40 system is driven to the first natural hop, continued under
+# zero-power held phase until the first common +x recrossing is accepted, and
+# only then branched into native and energy-preserving vx-direction-reversed
+# fully coupled trajectories. No prior artifact ZIP is required.
 
 python3 -m venv .venv
 source .venv/bin/activate
@@ -16,7 +16,7 @@ export OPENBLAS_NUM_THREADS=1
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 
-python scripts/run_ip1s_local_validation.py
+python scripts/run_ip1t_local_validation.py
 
 echo
-printf 'IP1s completed. Results are under: ip1s-local-validation/\n'
+printf 'IP1t completed. Results are under: ip1t-local-validation/\n'
