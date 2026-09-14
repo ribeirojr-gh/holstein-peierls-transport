@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Self-contained local runner for IP1g controlled single-relocation wake validation.
-# This stage runs new deterministic 40x40 dynamics. No prior artifact ZIP is required.
+# Self-contained local runner for IP1h fixed-boundary flux reanalysis.
+# No dynamics are rerun. By default the newest complete IP1g artifact under
+# ip1g-local-validation/ is selected automatically.
 
 python3 -m venv .venv
 source .venv/bin/activate
@@ -13,7 +14,11 @@ export OPENBLAS_NUM_THREADS=1
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 
-python scripts/run_ip1g_local_validation.py
+if [[ $# -gt 0 ]]; then
+  python scripts/run_ip1h_local_validation.py "$1"
+else
+  python scripts/run_ip1h_local_validation.py
+fi
 
 echo
-printf 'IP1g completed. Results are under: ip1g-local-validation/\n'
+printf 'IP1h completed. Results are under: ip1h-local-validation/\n'
