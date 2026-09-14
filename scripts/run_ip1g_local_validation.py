@@ -84,7 +84,7 @@ def main() -> None:
                 "tests/test_ip1f_phonon_wake.py",
                 "tests/test_ip1p_phonon_recurrence.py",
                 "tests/test_numerical_validation.py",
-                "tests/test_d2_coupled_dynamics.py",
+                "tests/test_d2_coupled.py",
                 "tests/test_static_solver.py",
                 "-q",
             ],
