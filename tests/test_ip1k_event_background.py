@@ -22,13 +22,13 @@ def test_matched_window_uses_complete_baseline_and_post_interval():
     assert times[window.post_mask][-1] == pytest.approx(3300.0)
 
 
-def test_complete_real_events_reject_overlapping_and_incomplete_windows():
+def test_complete_real_events_reject_other_event_starts_inside_window():
     times = np.arange(0.0, 5000.0 + 2.0, 2.0)
-    events = np.array([600.0, 1600.0, 2496.0, 4108.0])
+    events = np.array([600.0, 1600.0, 2200.0, 2496.0, 4108.0])
     selected = complete_real_event_times(times, events)
-    # 600 fs lacks the required 700 fs prehistory. 1600 and 2496 overlap
-    # because they are less than 1500 fs apart. 4108 has a complete isolated
-    # window ending at 4908 fs.
+    # 600 fs lacks the required 700 fs prehistory. The 1600/2200/2496
+    # cluster contaminates each local [-700,+800] fs window with another
+    # persistent-event start. 4108 fs remains complete and isolated.
     assert selected.tolist() == pytest.approx([4108.0])
 
 
