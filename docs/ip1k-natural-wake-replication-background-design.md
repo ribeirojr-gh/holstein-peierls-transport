@@ -6,7 +6,7 @@ IP1j establishes the **existence** of a backward-propagating intermolecular ener
 
 IP1k therefore asks the next necessary question:
 
-> Is the weak retrograde branch reproducibly associated with persistent carrier relocations, or can the same signature be produced by continuous field-driven lattice oscillations in event-free windows?
+> Is the weak retrograde branch reproducibly associated with persistent carrier relocations, or can the same signature be produced by continuous field-driven lattice oscillations during the same pre-hop residence state?
 
 This stage is deliberately an event/background discrimination experiment. It does not estimate mobility, hopping rates, activation barriers, threshold fields or material phonon lifetimes.
 
@@ -33,7 +33,7 @@ The field amplitude remains a numerical protocol control, not a material-calibra
 
 ## Real-event windows
 
-Analyze **every persistent nearest-neighbor x relocation** for which a complete local window fits inside the trajectory and does not overlap another persistent x relocation.
+Analyze **every persistent nearest-neighbor x relocation** for which a complete local window fits inside the trajectory and does not contain another persistent x relocation.
 
 For one event starting at `t0`:
 
@@ -47,20 +47,23 @@ A real event is excluded if either its baseline or post window contains another 
 
 The 800 fs post window is long enough to capture the IP1j anisotropic backward d1->d2 delay near 584 fs while remaining shorter than the 1612 fs first-to-second anisotropic event separation observed in IP1i/IP1j.
 
-## Matched pseudo-event background
+## Residence-matched pseudo-event background
 
-For each condition, construct deterministic pseudo-event times from event-free parts of the **same trajectory**.
+For each real event, construct deterministic pseudo-event times from event-free parts of the **same trajectory and the same pre-hop persistent-x residence interval**.
 
-Candidate pseudo-event centers are sampled every 100 fs and must satisfy:
+Candidate pseudo-event centers are sampled every **20 fs** and must satisfy:
 
 1. at least 700 fs of trajectory exists before the candidate;
 2. at least 800 fs exists after it;
 3. the complete `[-700,+800] fs` window contains no persistent x-event start;
-4. the same spatial/event-axis convention used by the corresponding real event is retained.
+4. the candidate occurs after the previous persistent x relocation, if one exists, and before the real event under analysis;
+5. the same source-centered event frame and carrier-direction convention used by the corresponding real event is retained.
 
-For a pseudo-event at time `tp`, use exactly the same baseline subtraction and d=1/d=2 boundary analysis as for a real event. This creates an empirical null distribution for continuous field-driven lattice oscillations without introducing a different Hamiltonian or a separate arbitrary no-field control.
+The residence restriction matters. It prevents, for example, comparing the second anisotropic hop from site 819 with a pseudo window centered on the earlier site-820 residence. For the second anisotropic event, the 1612 fs inter-event spacing leaves only about 112 fs of complete event-free pseudo-center support once the full `[-700,+800] fs` window is enforced. A 20 fs cadence provides at least five matched controls in that interval.
 
-Pseudo-event windows are correlated samples and are therefore used for empirical background percentiles, not formal independent-sample p-values.
+For a pseudo-event at time `tp`, use exactly the same baseline subtraction and d=1/d=2 boundary analysis as for the real event. This creates an empirical null distribution for continuous field-driven lattice oscillations in the **same carrier residence basin**, without introducing a different Hamiltonian or an arbitrary no-field control.
+
+Pseudo-event windows overlap and are therefore correlated samples. They are used for empirical background percentiles, not formal independent-sample p-values.
 
 ## Primary observables
 
@@ -92,7 +95,7 @@ The same diagnostic is computed for the forward branch, but forward propagation 
 
 ## Event-associated amplitude gate
 
-For each real event compare the two backward-amplitude observables with the pseudo-event background for the same condition and event frame:
+For each real event compare the two backward-amplitude observables with its own residence-matched pseudo-event background:
 
 - d=2 backward positive outward energy;
 - d=2 peak backward outward flux.
@@ -134,7 +137,7 @@ Before physical interpretation:
 9. projected intermolecular zero modes remain controlled;
 10. all real and pseudo metrics are finite;
 11. at least one complete real event is available in each condition;
-12. at least five valid pseudo-event windows are available in each condition.
+12. **every complete real event has at least five residence-matched pseudo-event windows**.
 
 Physical packet/background outcomes are not numerical acceptance gates.
 
@@ -142,6 +145,7 @@ Physical packet/background outcomes are not numerical acceptance gates.
 
 - The electric field remains on in real and pseudo windows.
 - Pseudo-event samples from one deterministic trajectory are not statistically independent.
+- The 20 fs cadence is chosen to obtain several controls in the short second anisotropic residence interval; overlapping pseudo windows do not increase the number of independent trajectories.
 - Baseline subtraction does not uniquely separate bound polaron dressing from free normal modes.
 - d1->d2 delay is a packet-propagation diagnostic, not a unique material phonon group velocity.
 - A weak but background-separated retrograde component may coexist with strongly forward-dominated total radiation.
