@@ -3,20 +3,43 @@ set -euo pipefail
 
 # Self-contained local runner for the IP1e no-dynamics size-aware recheck.
 # Usage:
-#   bash run.sh [path/to/ip1e-local-validation/<timestamp>]
+#   bash run.sh
+#   bash run.sh path/to/ip1e-local-validation/<timestamp>
+#   bash run.sh path/to/ip1e-local-validation.zip
 #
-# If no path is supplied, the newest directory under ip1e-local-validation/
-# is selected automatically. If only ip1e-local-validation.zip is present,
-# it is extracted first.
+# With no argument, the runner uses the newest directory under
+# ip1e-local-validation/. If only ./ip1e-local-validation.zip is present,
+# it extracts that archive first.
 
-if [[ ! -d ip1e-local-validation && -f ip1e-local-validation.zip ]]; then
-  unzip -q ip1e-local-validation.zip
+INPUT="${1:-}"
+
+# If the user supplied the original validation ZIP explicitly, extract it into
+# the current repository root and continue with automatic artifact discovery.
+if [[ -n "${INPUT}" && -f "${INPUT}" && "${INPUT}" == *.zip ]]; then
+  echo "Extracting artifact ZIP: ${INPUT}"
+  unzip -q "${INPUT}" -d .
+  INPUT=""
 fi
 
-ARTIFACT_DIR="${1:-}"
+# No explicit input: extract a ZIP in the repository root when present.
+if [[ -z "${INPUT}" && ! -d ip1e-local-validation && -f ip1e-local-validation.zip ]]; then
+  echo "Extracting ./ip1e-local-validation.zip"
+  unzip -q ip1e-local-validation.zip -d .
+fi
+
+ARTIFACT_DIR="${INPUT}"
 if [[ -z "${ARTIFACT_DIR}" ]]; then
   if [[ ! -d ip1e-local-validation ]]; then
-    echo "ERROR: ip1e-local-validation/ not found and no artifact directory was supplied." >&2
+    cat >&2 <<'EOF'
+ERROR: no IP1e validation artifact was found.
+
+Expected either:
+  1. ./ip1e-local-validation/<timestamp>/
+  2. ./ip1e-local-validation.zip
+  3. an explicit directory or ZIP argument, for example:
+       bash run.sh ~/Downloads/ip1e-local-validation.zip
+       bash run.sh /path/to/ip1e-local-validation/20260907T183017Z
+EOF
     exit 2
   fi
   ARTIFACT_DIR="$(find ip1e-local-validation -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
@@ -33,6 +56,8 @@ for required in baseline20-ip1d.json large40-ip1d.json weak40-ip1d.json; do
     exit 2
   fi
 done
+
+echo "Using IP1e artifact directory: ${ARTIFACT_DIR}"
 
 python3 -m venv .venv
 source .venv/bin/activate
