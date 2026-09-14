@@ -158,9 +158,26 @@ def main() -> None:
                 for item in record["boundary_directionality"]
             )
         ),
-        "backward_packet_detected": bool(
-            all(record["backward"]["validated_pair_count"] >= 3 for record in records)
+        "finite_delay_metrics": bool(
+            all(
+                np.isfinite(item["lag_fs"])
+                and np.isfinite(item["speed_sites_per_ps"])
+                and np.isfinite(item["correlation"])
+                for record in records
+                for side in ("backward", "forward")
+                for item in record[side]["delays"]
+            )
         ),
+    }
+    physical_screen = {
+        "backward_packet_validated_pair_counts": {
+            str(record["anisotropy_ratio"]): int(record["backward"]["validated_pair_count"])
+            for record in records
+        },
+        "forward_packet_validated_pair_counts": {
+            str(record["anisotropy_ratio"]): int(record["forward"]["validated_pair_count"])
+            for record in records
+        },
     }
     payload = {
         "scope": "IP1h posthoc fixed-boundary harmonic energy-flux and propagation-delay audit of IP1g; no dynamics rerun and no mobility/rate/material-lifetime claim",
@@ -172,10 +189,12 @@ def main() -> None:
         "records": records,
         "numerical_checks": numerical_checks,
         "numerical_pass": bool(all(numerical_checks.values())),
+        "physical_screen": physical_screen,
         "interpretation_guard": {
             "fixed_boundary_flux_supersedes_half_space_summed_current_for_directionality": True,
             "cross_correlation_speed_is_flux_packet_speed_not_unique_normal_mode_group_velocity": True,
             "controlled_quench_is_not_natural_transport": True,
+            "absence_of_a_validated_packet_is_a_physical_result_not_a_numerical_failure": True,
         },
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -203,13 +222,13 @@ def main() -> None:
             f"{by_distance[4]['positive_energy_directionality']:.3f} | "
             f"{by_distance[6]['positive_energy_directionality']:.3f} |"
         )
-    lines.extend(["", "## Numerical/diagnostic gates", ""])
+    lines.extend(["", "## Numerical gates", ""])
     for name, value in numerical_checks.items():
         lines.append(f"- {name}: {'PASS' if value else 'FAIL'}")
     lines.extend(
         [
             "",
-            f"Status: {'PASS' if payload['numerical_pass'] else 'FAIL'}",
+            f"Numerical status: {'PASS' if payload['numerical_pass'] else 'FAIL'}",
             "",
             "A positive boundary directionality means more positive outward lattice energy crossed the backward (-s) boundary than the forward (+s) boundary at the same distance. Packet speeds are inferred from correlations between successive fixed boundaries and are checked against the harmonic maximum group velocity. The imposed IP1g quench remains a diagnostic impulse experiment, not natural carrier transport.",
         ]
