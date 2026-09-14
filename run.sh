@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Self-contained local runner for IP1j first-natural-hop field-driven wake validation.
+# Self-contained local runner for IP1k natural-hop wake replication/background audit.
 # This stage reruns only the isotropic and anisotropic 40x40, 10 mV/A controls.
 # No prior artifact ZIP is required.
 
@@ -14,7 +14,7 @@ export OPENBLAS_NUM_THREADS=1
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 
-python scripts/run_ip1j_local_validation.py
+python scripts/run_ip1k_local_validation.py
 
 echo
-printf 'IP1j completed. Results are under: ip1j-local-validation/\n'
+printf 'IP1k completed. Results are under: ip1k-local-validation/\n'
