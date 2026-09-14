@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Self-contained local runner for IP1m isotropic single-hop wake-memory validation.
-# This stage reruns only the isotropic 40x40, 10 mV/A control and saves the
-# complete sampled intermolecular x-current trajectory for posthoc analysis.
+# Self-contained local runner for IP1n gauge-continuous field-release validation.
+# The isotropic 40x40 system is driven until the first natural x hop is accepted,
+# then cloned into field-on and zero-power held-phase continuations.
 # No prior artifact ZIP is required.
 
 python3 -m venv .venv
@@ -15,7 +15,7 @@ export OPENBLAS_NUM_THREADS=1
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 
-python scripts/run_ip1m_local_validation.py
+python scripts/run_ip1n_local_validation.py
 
 echo
-printf 'IP1m completed. Results are under: ip1m-local-validation/\n'
+printf 'IP1n completed. Results are under: ip1n-local-validation/\n'
