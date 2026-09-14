@@ -51,7 +51,7 @@ def test_trailing_amplitude_handles_alternating_boundary_signs():
     )
     matrix = trailing_outward_matrix(profiles, s, distances_sites=(1, 2))
     # backward outward current is -j(-d)
-    assert matrix.tolist() == pytest.approx([[-1.0, 2.0], [-2.0, 4.0]])
+    assert np.allclose(matrix, np.array([[-1.0, 2.0], [-2.0, 4.0]]))
     amplitude = trailing_amplitude_series(matrix)
     assert amplitude[0] == pytest.approx(np.sqrt(2.5))
     assert amplitude[1] == pytest.approx(np.sqrt(10.0))
