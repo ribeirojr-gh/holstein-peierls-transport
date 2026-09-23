@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Self-contained local runner for IP2a-2 pre-intervention event-generation
-# calibration. This stage evaluates only field-free preparation stability,
-# numerical quality, and first persistent-event yield for the fixed eight-member
-# pilot subset at the three preregistered candidate energies. It does not create
-# native/reversed post-event branches.
+# IP2a-3: independent numerical time-step diagnostic for pre-event
+# electric-field energy/work balance. Fixed unperturbed and member-0 references,
+# dt=0.2/0.1/0.05 fs, no native/reversed post-event branches. IP2a-2 remains
+# formally unqualified regardless of the refinement result.
+#
+# Invoke as "bash run.sh" to avoid changing this tracked file's executable bit.
 
 python3 -m venv .venv
 source .venv/bin/activate
@@ -16,7 +17,7 @@ export OPENBLAS_NUM_THREADS=1
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 
-python scripts/run_ip2a2_local_validation.py
+python scripts/run_ip2a3_local_validation.py
 
 echo
-printf 'IP2a-2 completed. Results are under: ip2a2-local-validation/\n'
+printf 'IP2a-3 completed. Results are under: ip2a3-local-validation/\n'
