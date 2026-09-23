@@ -17,6 +17,25 @@ Across an independently generated ensemble of physically matched post-hop states
 
 ## Phase IP2a — ensemble construction and numerical reproducibility
 
+### IP2a-1 — construction-only validation
+
+Before any field-driven feasibility calculation, validate the deterministic 32-member preparation family at all three candidate energies. This substage is restricted to:
+
+- exact fixed added kinetic/matter energy;
+- zero-mode removal;
+- low-q Fourier support;
+- exact sign-opposite pairing;
+- zero ensemble-mean added velocity;
+- distinctness of the 16 base preparations;
+- unchanged lattice coordinates and electronic state at preparation.
+
+**IP2a-1 must not propagate native/reversed outcomes and must not select the production perturbation energy.**
+
+### IP2a-2 — pre-intervention event-generation calibration
+
+Only after IP2a-1 passes, run the preregistered calibration subset across the three candidate energies. IP2a-2 may inspect only pre-intervention diagnostics: integration stability, first-x-event yield within the fixed search horizon, field-on numerical quality, and absence of immediate preparation-induced relocation. It may not create or compare native/reversed post-hop branches.
+
+
 ### Common physical model
 
 Retain the validated isotropic model and integrator:
