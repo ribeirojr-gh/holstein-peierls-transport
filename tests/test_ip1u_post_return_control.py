@@ -2,6 +2,7 @@ import pytest
 
 from holstein_peierls.dynamics.post_return_control import (
     classify_post_return_escape,
+    first_x_event_in_window,
     is_direct_reescape_event,
 )
 
@@ -90,3 +91,29 @@ def test_reject_invalid_events_and_threshold():
         classify_post_return_escape(
             None, None, returned_site=819, previous_site=819
         )
+
+
+def test_event_must_be_accepted_within_escape_window():
+    inside = _event(start=4400.0)
+    outside = _event(start=4900.0)
+    outside["accepted_time_fs"] = 4935.0
+    selected = first_x_event_in_window(
+        [outside, inside], branch_time_fs=3392.0, window_fs=1500.0
+    )
+    assert selected == inside
+    assert first_x_event_in_window(
+        [outside], branch_time_fs=3392.0, window_fs=1500.0
+    ) is None
+
+
+def test_first_x_event_window_ignores_non_x_and_pre_branch_event():
+    non_x = _event(start=3420.0)
+    non_x.update(dx_sites=0, dy_sites=1, direction="+y")
+    pre_branch = _event(start=3380.0)
+    inside = _event(start=3500.0)
+    result = first_x_event_in_window(
+        [non_x, pre_branch, inside], branch_time_fs=3392.0, window_fs=1500.0
+    )
+    assert result == inside
+    with pytest.raises(ValueError):
+        first_x_event_in_window([], branch_time_fs=3392.0, window_fs=0.0)
