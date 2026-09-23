@@ -55,7 +55,7 @@ def _normalized_low_q_pattern(
     line = np.zeros(n, dtype=np.float64)
     # Fixed low-q amplitudes.  The phase maps are intentionally different for
     # x/y and use a 32-point phase grid, but no random generator.
-    weights = np.asarray([1.0, 0.72, 0.46, 0.28], dtype=np.float64)[:kmax]
+    weights = np.asarray(0.72 ** np.arange(kmax, dtype=np.float64), dtype=np.float64)
     for j, (mode, weight) in enumerate(zip(range(1, kmax + 1), weights, strict=True)):
         if axis == "x":
             phase_index = ((p + 1) * (3 * mode + 1) + 5 * j) % 32
