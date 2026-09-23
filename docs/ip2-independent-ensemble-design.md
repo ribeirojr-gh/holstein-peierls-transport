@@ -1,4 +1,4 @@
-# IP2 — independent ensemble study of Peierls-phase sensitivity
+# IP2 — deterministic design ensemble study of Peierls-phase sensitivity
 
 Date: 2026-09-23  
 Status: preregistration / design only
@@ -13,7 +13,7 @@ The objective is to determine whether the phase-direction intervention produces 
 
 ## Primary scientific question
 
-Across an independently generated ensemble of physically matched post-hop states, does energy-preserving reversal of non-special `vx` traveling direction produce a systematic increase in subsequent electronic-state divergence relative to numerical/reproducibility controls?
+Across a preregistered deterministic design ensemble of physically matched post-hop states, does energy-preserving reversal of non-special `vx` traveling direction produce a systematic increase in subsequent electronic-state divergence relative to numerical/reproducibility controls?
 
 ## Phase IP2a — ensemble construction and numerical reproducibility
 
@@ -33,6 +33,13 @@ Before any field-driven feasibility calculation, validate the deterministic 32-m
 
 ### IP2a-2 — pre-intervention event-generation calibration
 
+The fixed calibration subset is **member IDs 0, 4, 8, 12, 16, 20, 24, 28** (four antithetic pairs) at **all three** candidate energies. The driven event-search horizon is **4000 fs**. Before each driven trial, an independent **200 fs field-free continuation** of the same prepared state must show no persistent relocation; it is discarded rather than carried into the driven trial. A driven event starting in the first **200 fs** is classified as preparation-associated early relocation and does not count toward feasibility.
+
+A valid event-generation trial requires: first accepted persistent event is a nearest-neighbor x event within 4000 fs; no early event; field-free control clean; pre-event field-on energy/work, electronic norm, and zero-mode diagnostics within validated bounds. Stop on the first persistent event even if it is y-directed; never skip earlier y events to seek an x event.
+
+Choose the **smallest candidate energy** meeting: all eight pilot trials numerically stable and field-free clean, no early driven event, and at least **6 of 8** valid first-x-event trials. Ties are broken by lower energy. If none qualifies, do not select a production energy or begin IP2b. Record every pilot outcome, including rejected trials, before any native/reversed continuation.
+
+
 Only after IP2a-1 passes, run the preregistered calibration subset across the three candidate energies. IP2a-2 may inspect only pre-intervention diagnostics: integration stability, first-x-event yield within the fixed search horizon, field-on numerical quality, and absence of immediate preparation-induced relocation. It may not create or compare native/reversed post-hop branches.
 
 
@@ -49,7 +56,7 @@ Retain the validated isotropic model and integrator:
 - gauge-continuous held Peierls phase after the accepted event
 - no external power during paired continuation.
 
-### Independent initial-condition family
+### Distinct deterministic initial-condition family
 
 Generate a deterministic grid of **32 distinct low-energy lattice phase-space preparations** before the driven event search.
 
@@ -67,9 +74,9 @@ The perturbation energy must be small relative to the validated IP1q autonomous 
 
 This calibration stage may not inspect native-versus-reversed outcome differences.
 
-### Independence guard
+### Design-distinctness and statistical-inference guard
 
-Translations of the exact same state are symmetry copies and do not count as independent ensemble members. Distinct ensemble members must differ in Peierls phase-space coordinates/velocities before the field-driven event generation.
+Translations of the exact same state are symmetry copies and do not count as distinct ensemble members. Distinct members must differ in Peierls phase-space coordinates/velocities before the field-driven event generation. The 32 preparations form a fixed deterministic phase grid with 16 antithetic (+/- velocity) pairs; they are **not independent random samples**. Treat ensemble summaries as finite-design descriptive statistics, not population probabilities or confidence intervals. A separate stochastic ensemble, if needed later, must specify a sampling distribution and count antithetic pairs as dependent clusters.
 
 ### Event inclusion
 
@@ -125,9 +132,9 @@ IP2b will be classified as evidence of reproducible trajectory sensitivity only 
 2. median `D_i >= 0.25`;
 3. at least 60% of valid members reach `L1 >= 0.25` within 2 ps;
 4. median `D_i / max(D_i^ctrl, 1e-12) >= 100`;
-5. a two-sided paired sign/permutation analysis of an intervention-sensitive scalar endpoint is reported with exact/randomization confidence interval; no result is classified from a p-value alone.
+5. the full 32-member finite-design response distribution and member-level results are reported, preserving all 16 antithetic-pair identifiers and all prespecified exclusions; **no p-values, permutation/randomization claims, or population confidence intervals are assigned to this deterministic grid**.
 
-The principal conclusion is deterministic ensemble sensitivity under the modeled intervention. It is still not a physical hopping rate or probability.
+The principal conclusion is reproducible sensitivity across the **tested deterministic design states** under the modeled intervention. It is not a population-level probability statement, a physical hopping rate, or a mobility measurement.
 
 ## Secondary discrete-event analysis
 
@@ -174,7 +181,7 @@ A failed numerical gate rejects that member before physical aggregation and reco
 
 ## Multiplicity / analysis discipline
 
-- IP2b has one primary endpoint: ensemble distribution of maximum population L1 in 2 ps.
+- IP2b has one primary endpoint: the **finite-design distribution** of maximum population L1 in 2 ps.
 - Event disagreement and modal correlations are secondary.
 - q-band-specific interventions are not tested in IP2b.
 - No branch point/window/threshold is changed after production outcomes are inspected.
@@ -188,6 +195,6 @@ If it passes, proceed to IP2c with a new preregistration that tests fixed q band
 
 ## Scope guard
 
-Even a positive IP2b result supports only reproducible sensitivity of deterministic coupled trajectories to a Peierls phase-direction intervention in this model.
+Even a positive IP2b result supports only reproducible sensitivity across the fixed deterministic preparation grid to a Peierls phase-direction intervention in this model.
 
 A physical hopping probability/rate requires a physically justified statistical ensemble (e.g. thermalized initial conditions and/or stochastic bath model), adequate independent sampling, censoring treatment, convergence with system size/time step, and a separately preregistered rate estimator.
