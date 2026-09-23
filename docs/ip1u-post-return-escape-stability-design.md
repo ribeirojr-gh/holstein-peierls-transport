@@ -52,6 +52,7 @@ Does the Peierls traveling direction control the stability of the returned state
 Use a primary escape window of **1.5 ps** after the post-return branch point.
 
 For each branch record the first persistent nearest-neighbor x event.
+An event counts in this primary window only if its transition starts at or after the branch point and its **persistent acceptance is no later than the 1.5 ps cutoff**. An event started inside but accepted after the cutoff is excluded. Compare the transition-start times when both branches have direct re-escapes.
 
 Define `reescape_status_changed = true` if any of:
 - one branch has an x event in the window and the other does not;
