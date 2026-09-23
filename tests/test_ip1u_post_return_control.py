@@ -95,7 +95,7 @@ def test_reject_invalid_events_and_threshold():
 
 def test_event_must_be_accepted_within_escape_window():
     inside = _event(start=4400.0)
-    outside = _event(start=4900.0)
+    outside = _event(start=4880.0)
     outside["accepted_time_fs"] = 4935.0
     selected = first_x_event_in_window(
         [outside, inside], branch_time_fs=3392.0, window_fs=1500.0
