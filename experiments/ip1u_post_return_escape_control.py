@@ -37,7 +37,10 @@ from holstein_peierls.dynamics.numerical_validation import (
     size_scaled_energy_balance_tolerance_eV,
 )
 from holstein_peierls.dynamics.phonon_wake import intermolecular_energy_flux
-from holstein_peierls.dynamics.post_return_control import classify_post_return_escape
+from holstein_peierls.dynamics.post_return_control import (
+    classify_post_return_escape,
+    first_x_event_in_window,
+)
 from holstein_peierls.dynamics.single_hop_memory import continuation_neighbor
 from holstein_peierls.dynamics.thermal import zero_mode_means
 
@@ -49,19 +52,6 @@ EVENT_TIME_DIFFERENCE_FS = 100.0
 L1_DIVERGENCE_THRESHOLD = 0.25
 L1_EARLY_THRESHOLD = 0.10
 PRIMARY_DISTANCES = (1, 2, 3, 4)
-
-
-def _first_x_event(events: list[dict], branch_time_fs: float, window_fs: float) -> dict | None:
-    cutoff = float(branch_time_fs) + float(window_fs)
-    candidates = [
-        event
-        for event in events
-        if event["is_nearest_neighbor"]
-        and abs(int(event["dx_sites"])) == 1
-        and int(event["dy_sites"]) == 0
-        and float(event["transition_start_time_fs"]) <= cutoff
-    ]
-    return None if not candidates else min(candidates, key=lambda item: item["transition_start_time_fs"])
 
 
 def _event_record(event) -> dict:
@@ -504,8 +494,12 @@ def main() -> None:
                 else:
                     first_l1_025 = value
 
-            native_first = _first_x_event(events["native"], tr, ESCAPE_WINDOW_FS)
-            reversed_first = _first_x_event(events["reversed"], tr, ESCAPE_WINDOW_FS)
+            native_first = first_x_event_in_window(
+                events["native"], branch_time_fs=tr, window_fs=ESCAPE_WINDOW_FS
+            )
+            reversed_first = first_x_event_in_window(
+                events["reversed"], branch_time_fs=tr, window_fs=ESCAPE_WINDOW_FS
+            )
             commitment = classify_post_return_escape(
                 native_first,
                 reversed_first,
