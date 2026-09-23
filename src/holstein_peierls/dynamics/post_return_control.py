@@ -13,6 +13,26 @@ def _is_x_event(event: dict | None) -> bool:
     )
 
 
+
+def first_x_event_in_window(
+    events: list[dict], *, branch_time_fs: float, window_fs: float
+) -> dict | None:
+    """First confirmed x event whose start AND acceptance fall in the window."""
+    if float(window_fs) <= 0.0:
+        raise ValueError("window_fs must be positive")
+    start = float(branch_time_fs)
+    cutoff = start + float(window_fs)
+    candidates = [
+        event for event in events
+        if _is_x_event(event)
+        and start <= float(event["transition_start_time_fs"]) <= cutoff
+        and float(event["accepted_time_fs"]) <= cutoff
+    ]
+    return None if not candidates else min(
+        candidates, key=lambda item: float(item["transition_start_time_fs"])
+    )
+
+
 def is_direct_reescape_event(
     event: dict | None, *, returned_site: int, previous_site: int
 ) -> bool:
