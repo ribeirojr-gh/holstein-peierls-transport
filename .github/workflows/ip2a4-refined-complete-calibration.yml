@@ -1,0 +1,63 @@
+name: ip2a4-refined-complete-calibration
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - isotropic-polaron-barrier
+    paths:
+      - '.github/workflows/ip2a4-refined-complete-calibration.yml'
+
+concurrency:
+  group: ip2a4-refined-complete-calibration
+  cancel-in-progress: false
+
+jobs:
+  ip2a4:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      PYTHONUNBUFFERED: '1'
+
+    steps:
+      - name: Checkout preregistered branch state
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install package and validation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
+
+      - name: Record GitHub execution provenance
+        run: |
+          echo "GITHUB_SHA=$GITHUB_SHA"
+          echo "GITHUB_REF=$GITHUB_REF"
+          echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+          echo "GITHUB_RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT"
+          git status --porcelain
+          python --version
+
+      - name: Run IP2a-4 refined complete calibration
+        run: python scripts/run_ip2a4_local_validation.py
+
+      - name: Upload complete IP2a-4 validation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ip2a4-refined-complete-calibration-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ip2a4-local-validation/
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 6
