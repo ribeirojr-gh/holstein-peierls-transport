@@ -1,0 +1,163 @@
+name: ip2b-production-paired-ensemble
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - isotropic-polaron-barrier
+    paths:
+      - '.github/workflows/ip2b-production-paired-ensemble.yml'
+
+concurrency:
+  group: ip2b-production-paired-ensemble
+  cancel-in-progress: false
+
+env:
+  OPENBLAS_NUM_THREADS: '1'
+  OMP_NUM_THREADS: '1'
+  MKL_NUM_THREADS: '1'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
+      - name: Record provenance
+        run: |
+          mkdir -p ip2b-validation
+          {
+            echo "GITHUB_SHA=$GITHUB_SHA"
+            echo "GITHUB_REF=$GITHUB_REF"
+            echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+            echo "GITHUB_RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT"
+            python --version
+            git status --porcelain
+          } | tee ip2b-validation/provenance.txt
+      - name: Pycompile
+        run: |
+          python -m py_compile \
+            src/holstein_peierls/dynamics/ip2b_ensemble.py \
+            experiments/ip2b_member_counterfactual.py \
+            experiments/ip2b_aggregate.py
+      - name: Focused tests
+        run: |
+          pytest -q \
+            tests/test_ip2b_ensemble.py \
+            tests/test_ip1s_direction_reversal.py \
+            tests/test_ip2a_ensemble_preparation.py \
+            tests/test_d3_field_driven.py \
+            tests/test_numerical_validation.py
+      - name: Full test suite
+        run: pytest
+      - name: Recurrence preflight
+        run: |
+          python experiments/ip1p_phonon_recurrence_audit.py \
+            --nx 40 --ny 40 \
+            --lattice-spacing-A 3.0 \
+            --gamma-v-per-fs 0.0 \
+            --event-half-window-fs 500.0 \
+            --planned-final-time-fs 6000.0 \
+            --output ip2b-validation/recurrence.json \
+            --markdown ip2b-validation/recurrence.md
+      - name: Upload validation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ip2b-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ip2b-validation/
+          retention-days: 90
+
+  members:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        member: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install package
+        run: python -m pip install -e '.[dev]'
+      - name: Run IP2b member ${{ matrix.member }}
+        run: |
+          mkdir -p member-output
+          python experiments/ip2b_member_counterfactual.py \
+            --member-id '${{ matrix.member }}' \
+            --output 'member-output/member-${{ matrix.member }}.json' \
+            --arrays 'member-output/member-${{ matrix.member }}.npz'
+      - name: Upload member artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ip2b-member-${{ matrix.member }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: member-output/
+          if-no-files-found: error
+          retention-days: 90
+          compression-level: 6
+
+  aggregate:
+    if: always()
+    needs: [validate, members]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install package
+        run: python -m pip install -e '.[dev]'
+      - name: Download all member artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ip2b-member-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ip2b-members
+          merge-multiple: true
+      - name: Aggregate locked IP2b endpoints
+        run: |
+          mkdir -p ip2b-aggregate
+          python experiments/ip2b_aggregate.py \
+            --input-dir ip2b-members \
+            --output ip2b-aggregate/ip2b-aggregate.json \
+            --markdown ip2b-aggregate/ip2b-aggregate.md \
+            --arrays ip2b-aggregate/ip2b-aggregate.npz
+      - name: Record aggregate provenance
+        if: always()
+        run: |
+          {
+            echo "GITHUB_SHA=$GITHUB_SHA"
+            echo "GITHUB_REF=$GITHUB_REF"
+            echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+            echo "GITHUB_RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT"
+            echo "validate_result=${{ needs.validate.result }}"
+            echo "members_result=${{ needs.members.result }}"
+            git status --porcelain
+          } > ip2b-aggregate/provenance.txt
+      - name: Upload aggregate artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ip2b-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ip2b-aggregate/
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 6
