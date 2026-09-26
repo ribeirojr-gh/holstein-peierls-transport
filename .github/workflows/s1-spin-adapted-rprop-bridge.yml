@@ -1,0 +1,152 @@
+name: s1-spin-adapted-rprop-bridge
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - isotropic-polaron-barrier
+    paths:
+      - '.github/workflows/s1-spin-adapted-rprop-bridge.yml'
+
+concurrency:
+  group: s1-spin-adapted-rprop-bridge
+  cancel-in-progress: false
+
+env:
+  OPENBLAS_NUM_THREADS: '1'
+  OMP_NUM_THREADS: '1'
+  MKL_NUM_THREADS: '1'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
+      - name: Record provenance
+        run: |
+          mkdir -p s1-validation
+          {
+            echo "GITHUB_SHA=$GITHUB_SHA"
+            echo "GITHUB_REF=$GITHUB_REF"
+            echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+            echo "GITHUB_RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT"
+            python --version
+            git status --porcelain
+          } | tee s1-validation/provenance.txt
+      - name: Pycompile
+        run: |
+          python -m py_compile \
+            src/holstein_peierls/spin_adapted/relaxation_control.py \
+            src/holstein_peierls/spin_adapted/rprop_bridge.py \
+            experiments/s1_spin_adapted_rprop_branch.py \
+            experiments/s1_spin_adapted_rprop_aggregate.py
+      - name: Focused tests
+        run: |
+          pytest -q \
+            tests/test_s1_rprop_bridge.py \
+            tests/test_spin_relaxation_control.py \
+            tests/test_spin_adapted_static.py
+      - name: Full test suite
+        run: pytest
+      - name: Upload validation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s1-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: s1-validation/
+          retention-days: 90
+
+  branches:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        optimizer: [preconditioned, rprop]
+        multiplicity: [singlet, triplet]
+        seed: [onsite, bond_x, bond_y]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install package
+        run: python -m pip install -e '.[dev]'
+      - name: Run S1 branch
+        run: |
+          mkdir -p branch-output
+          python experiments/s1_spin_adapted_rprop_branch.py \
+            --structural-optimizer '${{ matrix.optimizer }}' \
+            --multiplicity '${{ matrix.multiplicity }}' \
+            --seed '${{ matrix.seed }}' \
+            --output 'branch-output/s1-${{ matrix.optimizer }}-${{ matrix.multiplicity }}-${{ matrix.seed }}.json'
+      - name: Upload S1 branch artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s1-${{ matrix.optimizer }}-${{ matrix.multiplicity }}-${{ matrix.seed }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: branch-output/
+          if-no-files-found: error
+          retention-days: 90
+
+  aggregate:
+    if: always()
+    needs: [validate, branches]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install package
+        run: python -m pip install -e '.[dev]'
+      - name: Download branch artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: s1-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: s1-branches
+          merge-multiple: true
+      - name: Aggregate S1
+        run: |
+          mkdir -p s1-aggregate
+          python experiments/s1_spin_adapted_rprop_aggregate.py \
+            --input-dir s1-branches \
+            --output s1-aggregate/s1-aggregate.json \
+            --markdown s1-aggregate/s1-aggregate.md
+      - name: Record aggregate provenance
+        if: always()
+        run: |
+          {
+            echo "GITHUB_SHA=$GITHUB_SHA"
+            echo "GITHUB_REF=$GITHUB_REF"
+            echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+            echo "GITHUB_RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT"
+            echo "validate_result=${{ needs.validate.result }}"
+            echo "branches_result=${{ needs.branches.result }}"
+            git status --porcelain
+          } > s1-aggregate/provenance.txt
+      - name: Upload S1 aggregate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s1-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: s1-aggregate/
+          if-no-files-found: warn
+          retention-days: 90
