@@ -488,6 +488,166 @@ def _harmonic_preconditioned_relaxation(
     )
 
 
+def _rprop_axis_update(
+    coordinate: np.ndarray,
+    gradient: np.ndarray,
+    previous_gradient: np.ndarray,
+    step_size: np.ndarray,
+    parameters: StaticPolaronParameters,
+) -> np.ndarray:
+    """Apply one non-backtracking RPROP update to a structural coordinate."""
+    product = gradient * previous_gradient
+    positive = product > 0.0
+    negative = product < 0.0
+
+    step_size[positive] = np.minimum(
+        step_size[positive] * parameters.acceleration_factor,
+        parameters.update_max,
+    )
+    step_size[negative] = np.maximum(
+        step_size[negative] * parameters.deceleration_factor,
+        parameters.update_min,
+    )
+
+    effective_gradient = np.asarray(gradient, dtype=np.float64).copy()
+    effective_gradient[negative] = 0.0
+    delta = -np.sign(effective_gradient) * step_size
+    coordinate += delta
+    previous_gradient[...] = effective_gradient
+    return np.asarray(delta, dtype=np.float64)
+
+
+def _fix_peierls_zero_mode_gauge(lattice: LatticeState) -> None:
+    """Fix exact translational Peierls zero modes after a component-wise step."""
+    lattice.vx -= np.mean(lattice.vx, axis=1, keepdims=True)
+    lattice.vy -= np.mean(lattice.vy, axis=0, keepdims=True)
+
+
+def _rprop_relaxation(
+    parameters: StaticPolaronParameters,
+    interaction: np.ndarray,
+    *,
+    n_closed: int,
+    multiplicity: SpinMultiplicity,
+    initial_lattice: LatticeState,
+    orbital_gradient_tolerance: float,
+    orbital_max_iterations: int,
+    gradient_convergence_criterion: float,
+    staggered_gap: float,
+) -> StaticReferencedExcitationResult:
+    """Relax the gapped referenced-excitation surface with robust RPROP.
+
+    The electronic state is solved with the same recovery path used by the
+    accepted harmonic-preconditioned S0 benchmark. The structural update is
+    the non-backtracking RPROP convention used by the modern two-body
+    stationary solvers. Peierls zero modes are gauge-fixed after every update.
+    """
+    lattice = initial_lattice.copy()
+    previous_u = np.zeros_like(lattice.u)
+    previous_vx = np.zeros_like(lattice.vx)
+    previous_vy = np.zeros_like(lattice.vy)
+    step_u = np.full_like(lattice.u, parameters.update_start)
+    step_vx = np.full_like(lattice.vx, parameters.update_start)
+    step_vy = np.full_like(lattice.vy, parameters.update_start)
+
+    current = _solve_electronic_with_recovery(
+        lattice,
+        parameters,
+        interaction,
+        n_closed=n_closed,
+        multiplicity=multiplicity,
+        neutral_orbitals=None,
+        excited_orbitals=None,
+        orbital_gradient_tolerance=orbital_gradient_tolerance,
+        orbital_max_iterations=orbital_max_iterations,
+        staggered_gap=staggered_gap,
+    )
+
+    final_update = 0.0
+    converged = False
+    iteration = 0
+
+    for iteration in range(1, parameters.max_iterations + 1):
+        neutral_ok = current.neutral.diagnostics.converged
+        excited_ok = current.excited.diagnostics.converged
+        gradient = referenced_excitation_gradient(lattice, parameters, current)
+        gradient_value = gradient.maximum_absolute_component
+
+        if not (neutral_ok and excited_ok):
+            break
+        if (
+            final_update < parameters.convergence_criterion
+            and gradient_value < gradient_convergence_criterion
+        ):
+            converged = True
+            break
+
+        old_u = lattice.u.copy()
+        old_vx = lattice.vx.copy()
+        old_vy = lattice.vy.copy()
+
+        _rprop_axis_update(lattice.u, gradient.u, previous_u, step_u, parameters)
+        _rprop_axis_update(lattice.vx, gradient.vx, previous_vx, step_vx, parameters)
+        _rprop_axis_update(lattice.vy, gradient.vy, previous_vy, step_vy, parameters)
+        _fix_peierls_zero_mode_gauge(lattice)
+
+        final_update = float(
+            max(
+                np.max(np.abs(lattice.u - old_u)),
+                np.max(np.abs(lattice.vx - old_vx)),
+                np.max(np.abs(lattice.vy - old_vy)),
+            )
+        )
+
+        current = _solve_electronic_with_recovery(
+            lattice,
+            parameters,
+            interaction,
+            n_closed=n_closed,
+            multiplicity=multiplicity,
+            neutral_orbitals=current.neutral.orbitals,
+            excited_orbitals=current.excited.orbitals,
+            orbital_gradient_tolerance=orbital_gradient_tolerance,
+            orbital_max_iterations=orbital_max_iterations,
+            staggered_gap=staggered_gap,
+        )
+
+        if current.neutral.diagnostics.converged and current.excited.diagnostics.converged:
+            trial_gradient = referenced_excitation_gradient(lattice, parameters, current)
+            if (
+                final_update < parameters.convergence_criterion
+                and trial_gradient.maximum_absolute_component < gradient_convergence_criterion
+            ):
+                converged = True
+                break
+
+    final_energy = referenced_excitation_energy(lattice, parameters, current)
+    final_gradient = referenced_excitation_gradient(lattice, parameters, current)
+    final_gradient_value = final_gradient.maximum_absolute_component
+    neutral_ok = current.neutral.diagnostics.converged
+    excited_ok = current.excited.diagnostics.converged
+    converged = converged or (
+        neutral_ok
+        and excited_ok
+        and final_update < parameters.convergence_criterion
+        and final_gradient_value < gradient_convergence_criterion
+    )
+
+    return StaticReferencedExcitationResult(
+        lattice=lattice,
+        state=current,
+        energy=final_energy,
+        gradient=final_gradient,
+        diagnostics=ReferencedExcitationRelaxationDiagnostics(
+            iterations=iteration,
+            converged=converged,
+            final_max_update=float(final_update),
+            final_max_gradient=float(final_gradient_value),
+            neutral_orbitals_converged=neutral_ok,
+            excited_orbitals_converged=excited_ok,
+        ),
+    )
+
 def relax_isotropic_spin_branch(
     parameters: StaticPolaronParameters,
     interaction: np.ndarray,
@@ -499,8 +659,15 @@ def relax_isotropic_spin_branch(
     orbital_max_iterations: int = 800,
     gradient_convergence_criterion: float = 1.0e-6,
     staggered_gap: float = 2.0,
+    structural_optimizer: str = "preconditioned",
 ) -> SpinRelaxationBranchResult:
-    """Relax one half-filled singlet/triplet branch from a canonical gapped seed."""
+    """Relax one half-filled singlet/triplet branch from a canonical gapped seed.
+
+    The structural optimizer is either 'preconditioned' (the established
+    harmonic-Newton/Armijo reference) or 'rprop' (the S1 non-backtracking
+    RPROP bridge). The electronic Hamiltonian and state-specific orbital
+    optimizer are identical between the two paths.
+    """
     if parameters.nx != parameters.ny:
         raise ValueError("the canonical isotropic relaxation benchmark requires nx=ny")
     if not np.isclose(parameters.j0x, parameters.j0y):
@@ -515,17 +682,32 @@ def relax_isotropic_spin_branch(
         seed_kind,
         amplitude=seed_amplitude,
     )
-    result = _harmonic_preconditioned_relaxation(
-        parameters,
-        interaction,
-        n_closed=half_filled_n_closed(parameters.n_sites),
-        multiplicity=multiplicity,
-        initial_lattice=initial_lattice,
-        orbital_gradient_tolerance=orbital_gradient_tolerance,
-        orbital_max_iterations=orbital_max_iterations,
-        gradient_convergence_criterion=gradient_convergence_criterion,
-        staggered_gap=staggered_gap,
-    )
+    if structural_optimizer == "preconditioned":
+        result = _harmonic_preconditioned_relaxation(
+            parameters,
+            interaction,
+            n_closed=half_filled_n_closed(parameters.n_sites),
+            multiplicity=multiplicity,
+            initial_lattice=initial_lattice,
+            orbital_gradient_tolerance=orbital_gradient_tolerance,
+            orbital_max_iterations=orbital_max_iterations,
+            gradient_convergence_criterion=gradient_convergence_criterion,
+            staggered_gap=staggered_gap,
+        )
+    elif structural_optimizer == "rprop":
+        result = _rprop_relaxation(
+            parameters,
+            interaction,
+            n_closed=half_filled_n_closed(parameters.n_sites),
+            multiplicity=multiplicity,
+            initial_lattice=initial_lattice,
+            orbital_gradient_tolerance=orbital_gradient_tolerance,
+            orbital_max_iterations=orbital_max_iterations,
+            gradient_convergence_criterion=gradient_convergence_criterion,
+            staggered_gap=staggered_gap,
+        )
+    else:
+        raise ValueError("structural_optimizer must be 'preconditioned' or 'rprop'")
     return SpinRelaxationBranchResult(
         multiplicity=multiplicity,
         seed=seed_kind,
