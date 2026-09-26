@@ -1,0 +1,223 @@
+name: s1r-deterministic-singlet-root-manifold
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - isotropic-polaron-barrier
+    paths:
+      - '.github/workflows/s1r-deterministic-singlet-root-manifold.yml'
+
+concurrency:
+  group: s1r-deterministic-singlet-root-manifold
+  cancel-in-progress: false
+
+env:
+  OPENBLAS_NUM_THREADS: '1'
+  OMP_NUM_THREADS: '1'
+  MKL_NUM_THREADS: '1'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.14'
+      - name: Install exact S1R numerical environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'numpy==2.5.3' 'scipy==1.18.1' 'pytest==9.1.1'
+          python -m pip install -e . --no-deps
+      - name: Record provenance
+        run: |
+          mkdir -p s1r-validation
+          {
+            echo "GITHUB_SHA=$GITHUB_SHA"
+            echo "GITHUB_REF=$GITHUB_REF"
+            echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+            echo "GITHUB_RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT"
+            python --version
+            python -c 'import numpy as np, scipy; print("numpy", np.__version__); print("scipy", scipy.__version__)'
+            echo "OPENBLAS_NUM_THREADS=$OPENBLAS_NUM_THREADS"
+            echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
+            echo "MKL_NUM_THREADS=$MKL_NUM_THREADS"
+            git status --porcelain
+          } | tee s1r-validation/provenance.txt
+      - name: Pycompile
+        run: |
+          python -m py_compile \
+            src/holstein_peierls/spin_adapted/excitation_reference.py \
+            src/holstein_peierls/spin_adapted/relaxation_control.py \
+            src/holstein_peierls/spin_adapted/s1r_root_manifold.py \
+            experiments/s1r_seed_preflight.py \
+            experiments/s1r_root_branch.py \
+            experiments/s1r_root_aggregate.py
+      - name: Focused S1R tests
+        run: |
+          pytest -q \
+            tests/test_s1r_root_manifold.py \
+            tests/test_spin_relaxation_control.py \
+            tests/test_excitation_reference.py \
+            tests/test_s1_rprop_bridge.py \
+            tests/test_s1p_provenance.py
+      - name: Full repository test suite
+        run: pytest
+      - name: Deterministic root-seed preflight
+        run: |
+          python experiments/s1r_seed_preflight.py \
+            --output s1r-validation/s1r-seed-preflight.json \
+            --markdown s1r-validation/s1r-seed-preflight.md
+      - name: Upload validation and seed-preflight artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s1r-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: s1r-validation/
+          retention-days: 90
+
+  singlets:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        optimizer: [preconditioned, rprop]
+        structural_seed: [onsite, bond_x, bond_y]
+        root_seed_id: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.14'
+      - name: Install exact S1R numerical environment
+        run: |
+          python -m pip install 'numpy==2.5.3' 'scipy==1.18.1'
+          python -m pip install -e . --no-deps
+      - name: Run deterministic singlet root branch
+        run: |
+          mkdir -p branch-output
+          python experiments/s1r_root_branch.py \
+            --structural-optimizer '${{ matrix.optimizer }}' \
+            --multiplicity singlet \
+            --structural-seed '${{ matrix.structural_seed }}' \
+            --root-seed-id '${{ matrix.root_seed_id }}' \
+            --output 'branch-output/s1r-singlet-${{ matrix.optimizer }}-${{ matrix.structural_seed }}-root${{ matrix.root_seed_id }}.json' \
+            --arrays 'branch-output/s1r-singlet-${{ matrix.optimizer }}-${{ matrix.structural_seed }}-root${{ matrix.root_seed_id }}.npz'
+      - name: Upload singlet branch artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s1r-singlet-${{ matrix.optimizer }}-${{ matrix.structural_seed }}-root${{ matrix.root_seed_id }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: branch-output/
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 6
+
+  triplets:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        optimizer: [preconditioned, rprop]
+        structural_seed: [onsite, bond_x, bond_y]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.14'
+      - name: Install exact S1R numerical environment
+        run: |
+          python -m pip install 'numpy==2.5.3' 'scipy==1.18.1'
+          python -m pip install -e . --no-deps
+      - name: Run deterministic triplet control branch
+        run: |
+          mkdir -p branch-output
+          python experiments/s1r_root_branch.py \
+            --structural-optimizer '${{ matrix.optimizer }}' \
+            --multiplicity triplet \
+            --structural-seed '${{ matrix.structural_seed }}' \
+            --root-seed-id 0 \
+            --output 'branch-output/s1r-triplet-${{ matrix.optimizer }}-${{ matrix.structural_seed }}-root0.json' \
+            --arrays 'branch-output/s1r-triplet-${{ matrix.optimizer }}-${{ matrix.structural_seed }}-root0.npz'
+      - name: Upload triplet branch artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s1r-triplet-${{ matrix.optimizer }}-${{ matrix.structural_seed }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: branch-output/
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 6
+
+  aggregate:
+    if: always()
+    needs: [validate, singlets, triplets]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.14'
+      - name: Install exact S1R numerical environment
+        run: |
+          python -m pip install 'numpy==2.5.3' 'scipy==1.18.1'
+          python -m pip install -e . --no-deps
+      - name: Create aggregate directory
+        run: mkdir -p s1r-aggregate s1r-branches
+      - name: Download singlet branch artifacts
+        if: needs.validate.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: s1r-singlet-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: s1r-branches
+          merge-multiple: true
+      - name: Download triplet branch artifacts
+        if: needs.validate.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: s1r-triplet-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: s1r-branches
+          merge-multiple: true
+      - name: Aggregate locked S1R manifold
+        if: needs.validate.result == 'success'
+        run: |
+          python experiments/s1r_root_aggregate.py \
+            --input-dir s1r-branches \
+            --output s1r-aggregate/s1r-aggregate.json \
+            --markdown s1r-aggregate/s1r-aggregate.md \
+            --arrays s1r-aggregate/s1r-aggregate.npz \
+            --full-pytest-passed
+      - name: Record aggregate provenance
+        if: always()
+        run: |
+          {
+            echo "GITHUB_SHA=$GITHUB_SHA"
+            echo "GITHUB_REF=$GITHUB_REF"
+            echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+            echo "GITHUB_RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT"
+            echo "validate_result=${{ needs.validate.result }}"
+            echo "singlets_result=${{ needs.singlets.result }}"
+            echo "triplets_result=${{ needs.triplets.result }}"
+            git status --porcelain
+          } > s1r-aggregate/provenance.txt
+      - name: Upload S1R aggregate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s1r-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: s1r-aggregate/
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 6
