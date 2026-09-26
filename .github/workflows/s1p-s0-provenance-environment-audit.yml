@@ -1,0 +1,173 @@
+name: s1p-s0-provenance-environment-audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - isotropic-polaron-barrier
+    paths:
+      - '.github/workflows/s1p-s0-provenance-environment-audit.yml'
+
+concurrency:
+  group: s1p-s0-provenance-environment-audit
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install current package
+        run: python -m pip install -e '.[dev]'
+      - name: Run focused and full tests
+        run: |
+          pytest -q tests/test_s1p_provenance.py tests/test_s1_rprop_bridge.py tests/test_spin_relaxation_control.py
+          pytest
+
+  provenance:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        source:
+          - historical
+          - current
+        numpy_version:
+          - '2.5.2'
+          - '2.5.3'
+        thread_policy:
+          - historical_unpinned
+          - single_thread
+        case:
+          - singlet-onsite
+          - singlet-bond_x
+          - singlet-bond_y
+          - triplet-onsite
+    steps:
+      - name: Checkout selected source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.source == 'historical' && 'ac651b7bacd4e19a1bc8f2c7311354028c76b8dc' || 'isotropic-polaron-barrier' }}
+          fetch-depth: 1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact numerical environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'numpy==${{ matrix.numpy_version }}' 'scipy==1.18.1' 'pytest==9.1.1'
+          python -m pip install -e . --no-deps
+      - name: Run historical-style branch and record provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p s1p-output
+          if [ '${{ matrix.thread_policy }}' = 'single_thread' ]; then
+            export OPENBLAS_NUM_THREADS=1
+            export OMP_NUM_THREADS=1
+            export MKL_NUM_THREADS=1
+          fi
+          case '${{ matrix.case }}' in
+            singlet-onsite) MULT=singlet; SEED=onsite ;;
+            singlet-bond_x) MULT=singlet; SEED=bond_x ;;
+            singlet-bond_y) MULT=singlet; SEED=bond_y ;;
+            triplet-onsite) MULT=triplet; SEED=onsite ;;
+            *) exit 2 ;;
+          esac
+          python experiments/spin_adapted_isotropic_relaxation.py \
+            --size 4 \
+            --staggered-gap 2.0 \
+            --lattice-max-iterations 1200 \
+            --multiplicity "$MULT" \
+            --seed "$SEED" \
+            --require-converged \
+            --output s1p-output/raw.json
+          git rev-parse HEAD > s1p-output/resolved-sha.txt
+          lscpu > s1p-output/lscpu.txt
+          python - <<'PY' > s1p-output/numpy-config.txt
+import numpy as np
+np.show_config()
+PY
+          SOURCE='${{ matrix.source }}' NUMPY_REQ='${{ matrix.numpy_version }}' THREAD='${{ matrix.thread_policy }}' MULT="$MULT" SEED="$SEED" python - <<'PY'
+import json, os, platform, subprocess
+from pathlib import Path
+import numpy as np, scipy
+raw=json.loads(Path('s1p-output/raw.json').read_text())
+branch=raw['branches'][0]
+record={
+ 'source_label':os.environ['SOURCE'],
+ 'resolved_source_sha':Path('s1p-output/resolved-sha.txt').read_text().strip(),
+ 'numpy_version_requested':os.environ['NUMPY_REQ'],
+ 'numpy_version_actual':np.__version__,
+ 'scipy_version_actual':scipy.__version__,
+ 'python_version':platform.python_version(),
+ 'thread_policy':os.environ['THREAD'],
+ 'thread_environment':{k:os.environ.get(k) for k in ('OPENBLAS_NUM_THREADS','OMP_NUM_THREADS','MKL_NUM_THREADS')},
+ 'multiplicity':os.environ['MULT'],
+ 'seed':os.environ['SEED'],
+ 'converged':bool(branch['converged']),
+ 'iterations':int(branch['iterations']),
+ 'total_referenced_energy_eV':float(branch['total_referenced_energy_eV']),
+ 'electronic_excitation_eV':float(branch['electronic_excitation_eV']),
+ 'lattice_energy_eV':float(branch['lattice_energy_eV']),
+ 'final_max_update_A':float(branch['final_max_update_A']),
+ 'final_max_gradient_eV_per_A':float(branch['final_max_gradient_eV_per_A']),
+}
+name=f"s1p-{record['source_label']}-{record['numpy_version_requested'].replace('.','p')}-{record['thread_policy']}-{record['multiplicity']}-{record['seed']}.json"
+Path('s1p-output',name).write_text(json.dumps(record,indent=2))
+print(json.dumps(record,indent=2))
+PY
+      - name: Upload provenance branch artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s1p-${{ matrix.source }}-${{ matrix.numpy_version }}-${{ matrix.thread_policy }}-${{ matrix.case }}-${{ github.run_id }}
+          path: s1p-output/
+          retention-days: 90
+
+  aggregate:
+    if: always()
+    needs: [validate, provenance]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install current package
+        run: python -m pip install -e '.[dev]'
+      - name: Download S1P artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: s1p-*-${{ github.run_id }}
+          path: s1p-records
+      - name: Aggregate S1P
+        run: |
+          mkdir -p s1p-aggregate
+          python experiments/s1p_provenance_aggregate.py \
+            --input-dir s1p-records \
+            --output s1p-aggregate/s1p-aggregate.json \
+            --markdown s1p-aggregate/s1p-aggregate.md
+      - name: Record aggregate provenance
+        if: always()
+        run: |
+          {
+            echo "GITHUB_SHA=$GITHUB_SHA"
+            echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+            echo "validate_result=${{ needs.validate.result }}"
+            echo "provenance_result=${{ needs.provenance.result }}"
+          } > s1p-aggregate/provenance.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s1p-aggregate-${{ github.run_id }}
+          path: s1p-aggregate/
+          retention-days: 90
