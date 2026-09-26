@@ -36,20 +36,10 @@ jobs:
       fail-fast: false
       max-parallel: 20
       matrix:
-        source:
-          - historical
-          - current
-        numpy_version:
-          - '2.5.2'
-          - '2.5.3'
-        thread_policy:
-          - historical_unpinned
-          - single_thread
-        case:
-          - singlet-onsite
-          - singlet-bond_x
-          - singlet-bond_y
-          - triplet-onsite
+        source: [historical, current]
+        numpy_version: ['2.5.2', '2.5.3']
+        thread_policy: [historical_unpinned, single_thread]
+        case: [singlet-onsite, singlet-bond_x, singlet-bond_y, triplet-onsite]
     steps:
       - name: Checkout selected source
         uses: actions/checkout@v4
@@ -92,38 +82,45 @@ jobs:
           git rev-parse HEAD > s1p-output/resolved-sha.txt
           lscpu > s1p-output/lscpu.txt
           python - <<'PY' > s1p-output/numpy-config.txt
-import numpy as np
-np.show_config()
-PY
+          import numpy as np
+          np.show_config()
+          PY
           SOURCE='${{ matrix.source }}' NUMPY_REQ='${{ matrix.numpy_version }}' THREAD='${{ matrix.thread_policy }}' MULT="$MULT" SEED="$SEED" python - <<'PY'
-import json, os, platform, subprocess
-from pathlib import Path
-import numpy as np, scipy
-raw=json.loads(Path('s1p-output/raw.json').read_text())
-branch=raw['branches'][0]
-record={
- 'source_label':os.environ['SOURCE'],
- 'resolved_source_sha':Path('s1p-output/resolved-sha.txt').read_text().strip(),
- 'numpy_version_requested':os.environ['NUMPY_REQ'],
- 'numpy_version_actual':np.__version__,
- 'scipy_version_actual':scipy.__version__,
- 'python_version':platform.python_version(),
- 'thread_policy':os.environ['THREAD'],
- 'thread_environment':{k:os.environ.get(k) for k in ('OPENBLAS_NUM_THREADS','OMP_NUM_THREADS','MKL_NUM_THREADS')},
- 'multiplicity':os.environ['MULT'],
- 'seed':os.environ['SEED'],
- 'converged':bool(branch['converged']),
- 'iterations':int(branch['iterations']),
- 'total_referenced_energy_eV':float(branch['total_referenced_energy_eV']),
- 'electronic_excitation_eV':float(branch['electronic_excitation_eV']),
- 'lattice_energy_eV':float(branch['lattice_energy_eV']),
- 'final_max_update_A':float(branch['final_max_update_A']),
- 'final_max_gradient_eV_per_A':float(branch['final_max_gradient_eV_per_A']),
-}
-name=f"s1p-{record['source_label']}-{record['numpy_version_requested'].replace('.','p')}-{record['thread_policy']}-{record['multiplicity']}-{record['seed']}.json"
-Path('s1p-output',name).write_text(json.dumps(record,indent=2))
-print(json.dumps(record,indent=2))
-PY
+          import json, os, platform
+          from pathlib import Path
+          import numpy as np, scipy
+          raw = json.loads(Path("s1p-output/raw.json").read_text())
+          branch = raw["branches"][0]
+          record = {
+              "source_label": os.environ["SOURCE"],
+              "resolved_source_sha": Path("s1p-output/resolved-sha.txt").read_text().strip(),
+              "numpy_version_requested": os.environ["NUMPY_REQ"],
+              "numpy_version_actual": np.__version__,
+              "scipy_version_actual": scipy.__version__,
+              "python_version": platform.python_version(),
+              "thread_policy": os.environ["THREAD"],
+              "thread_environment": {
+                  k: os.environ.get(k)
+                  for k in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
+              },
+              "multiplicity": os.environ["MULT"],
+              "seed": os.environ["SEED"],
+              "converged": bool(branch["converged"]),
+              "iterations": int(branch["iterations"]),
+              "total_referenced_energy_eV": float(branch["total_referenced_energy_eV"]),
+              "electronic_excitation_eV": float(branch["electronic_excitation_eV"]),
+              "lattice_energy_eV": float(branch["lattice_energy_eV"]),
+              "final_max_update_A": float(branch["final_max_update_A"]),
+              "final_max_gradient_eV_per_A": float(branch["final_max_gradient_eV_per_A"]),
+          }
+          name = (
+              f"s1p-{record['source_label']}-"
+              f"{record['numpy_version_requested'].replace('.', 'p')}-"
+              f"{record['thread_policy']}-{record['multiplicity']}-{record['seed']}.json"
+          )
+          Path("s1p-output", name).write_text(json.dumps(record, indent=2))
+          print(json.dumps(record, indent=2))
+          PY
       - name: Upload provenance branch artifact
         uses: actions/upload-artifact@v4
         if: always()
