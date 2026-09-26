@@ -47,6 +47,7 @@ from .pair_control import (
 from .relaxation_control import (
     IsotropicRelaxationSeed,
     SpinRelaxationBranchResult,
+    deterministic_root_seed_orbitals,
     half_filled_n_closed,
     harmonic_lattice_newton_direction,
     isotropic_relaxation_seed,
@@ -71,6 +72,7 @@ __all__ = [
     "SpinMultiplicity",
     "SpinRelaxationBranchResult",
     "StaticReferencedExcitationResult",
+    "deterministic_root_seed_orbitals",
     "StaticSpinAdaptedPairResult",
     "density_density_control_interaction",
     "exchange_control_matrix",
