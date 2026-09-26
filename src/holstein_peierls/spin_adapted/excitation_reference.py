@@ -221,7 +221,11 @@ def solve_referenced_excitation(
         raise ValueError("interaction shape does not match lattice")
 
     one_body = build_dense_hamiltonian(lattice, parameters)
-    canonical = _initial_orbitals(one_body)
+    canonical = (
+        _initial_orbitals(one_body)
+        if initial_neutral_orbitals is None or initial_excited_orbitals is None
+        else None
+    )
     neutral_initial = (
         canonical
         if initial_neutral_orbitals is None
@@ -232,6 +236,7 @@ def solve_referenced_excitation(
         if initial_excited_orbitals is None
         else np.asarray(initial_excited_orbitals, dtype=np.float64)
     )
+    assert neutral_initial is not None and excited_initial is not None
     neutral_sizes, excited_sizes = reference_shell_sizes(n_closed, multiplicity)
     if sum(neutral_sizes) > parameters.n_sites:
         raise ValueError("neutral occupied space exceeds lattice orbital space")
