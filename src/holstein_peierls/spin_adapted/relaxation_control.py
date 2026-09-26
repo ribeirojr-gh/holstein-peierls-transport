@@ -527,6 +527,8 @@ def _harmonic_preconditioned_relaxation(
                 orbital_gradient_tolerance=orbital_gradient_tolerance,
                 orbital_max_iterations=orbital_max_iterations,
                 staggered_gap=staggered_gap,
+                root_seed_id=root_seed_id,
+                root_seed_amplitude_eV=root_seed_amplitude_eV,
             )
             candidate_ok = (
                 candidate_state.neutral.diagnostics.converged
@@ -705,6 +707,8 @@ def _rprop_relaxation(
             orbital_gradient_tolerance=orbital_gradient_tolerance,
             orbital_max_iterations=orbital_max_iterations,
             staggered_gap=staggered_gap,
+            root_seed_id=root_seed_id,
+            root_seed_amplitude_eV=root_seed_amplitude_eV,
         )
 
         if current.neutral.diagnostics.converged and current.excited.diagnostics.converged:
