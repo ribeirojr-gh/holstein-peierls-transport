@@ -114,3 +114,94 @@ def test_harmonic_newton_direction_inverts_the_lattice_hessian() -> None:
     np.testing.assert_allclose(direction.vy, expected_vy, atol=2.0e-12)
     assert np.max(np.abs(np.mean(direction.vx, axis=1))) < 1.0e-13
     assert np.max(np.abs(np.mean(direction.vy, axis=0))) < 1.0e-13
+
+
+def test_s1_rprop_axis_update_is_non_backtracking_on_sign_change() -> None:
+    from holstein_peierls.spin_adapted import relaxation_control as rc
+
+    parameters = IsotropicControlParameters().to_polaron_parameters(nx=2, ny=2)
+    coordinate = np.zeros((2, 2), dtype=np.float64)
+    previous_gradient = np.zeros_like(coordinate)
+    step_size = np.full_like(coordinate, parameters.update_start)
+
+    first_gradient = np.ones_like(coordinate)
+    first_delta = rc._rprop_axis_update(
+        coordinate,
+        first_gradient,
+        previous_gradient,
+        step_size,
+        parameters,
+    )
+    np.testing.assert_allclose(first_delta, -parameters.update_start)
+
+    before = coordinate.copy()
+    second_gradient = -np.ones_like(coordinate)
+    second_delta = rc._rprop_axis_update(
+        coordinate,
+        second_gradient,
+        previous_gradient,
+        step_size,
+        parameters,
+    )
+    np.testing.assert_allclose(second_delta, 0.0)
+    np.testing.assert_allclose(coordinate, before)
+    np.testing.assert_allclose(
+        step_size,
+        parameters.update_start * parameters.deceleration_factor,
+    )
+
+
+def test_s1_rprop_peierls_gauge_removes_only_translation_zero_modes() -> None:
+    from holstein_peierls.spin_adapted import relaxation_control as rc
+
+    parameters = IsotropicControlParameters().to_polaron_parameters(nx=4, ny=4)
+    rng = np.random.default_rng(91)
+    lattice = LatticeState(
+        u=rng.normal(size=(4, 4)),
+        vx=rng.normal(size=(4, 4)),
+        vy=rng.normal(size=(4, 4)),
+    )
+    x_strain_before = np.roll(lattice.vx, -1, axis=1) - lattice.vx
+    y_strain_before = np.roll(lattice.vy, -1, axis=0) - lattice.vy
+    u_before = lattice.u.copy()
+
+    rc._fix_peierls_zero_mode_gauge(lattice)
+
+    np.testing.assert_allclose(lattice.u, u_before, atol=0.0)
+    assert np.max(np.abs(np.mean(lattice.vx, axis=1))) < 1.0e-15
+    assert np.max(np.abs(np.mean(lattice.vy, axis=0))) < 1.0e-15
+    np.testing.assert_allclose(
+        np.roll(lattice.vx, -1, axis=1) - lattice.vx,
+        x_strain_before,
+        atol=1.0e-14,
+    )
+    np.testing.assert_allclose(
+        np.roll(lattice.vy, -1, axis=0) - lattice.vy,
+        y_strain_before,
+        atol=1.0e-14,
+    )
+
+
+def test_s1_rejects_unknown_structural_optimizer() -> None:
+    from holstein_peierls.spin_adapted import (
+        SpinMultiplicity,
+        density_density_control_interaction,
+        relax_isotropic_spin_branch,
+    )
+
+    parameters = IsotropicControlParameters().to_polaron_parameters(
+        nx=4, ny=4, max_iterations=2
+    )
+    interaction = density_density_control_interaction(
+        parameters,
+        onsite_u=0.525,
+        nearest_neighbor_v=0.08,
+    )
+    with pytest.raises(ValueError, match="structural_optimizer"):
+        relax_isotropic_spin_branch(
+            parameters,
+            interaction,
+            multiplicity=SpinMultiplicity.SINGLET,
+            seed="onsite",
+            structural_optimizer="not-an-optimizer",
+        )
