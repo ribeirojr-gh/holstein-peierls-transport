@@ -150,7 +150,17 @@ No historical energy is used as a target in the optimizer.
 
 S1P diagnoses why the old arbitrary canonical basis changed. S1R removes that arbitrary basis choice.
 
-Paper-1 production runs will additionally pin exact Python/NumPy/SciPy versions and thread policy in the workflow/data manifest. Pinning is a reproducibility control, not a substitute for deterministic root enumeration.
+The S1R production workflow is prospectively pinned to:
+
+- Python **3.12.14**;
+- NumPy **2.5.3**;
+- SciPy **1.18.1**;
+- pytest **9.1.1** for the validation job;
+- `OPENBLAS_NUM_THREADS=1`, `OMP_NUM_THREADS=1`, `MKL_NUM_THREADS=1`.
+
+These versions are fixed before any S1R branch result is generated. Pinning is a reproducibility control, not a substitute for deterministic root enumeration.
+
+The validation job must also run a lightweight preflight for all 16 root-seed IDs on all three structural starting geometries and fail before the production matrix if any auxiliary spectrum has a minimum adjacent eigenvalue separation <= `1e-12 eV`.
 
 ## Stop rule
 
