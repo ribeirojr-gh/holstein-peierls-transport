@@ -138,3 +138,31 @@ def test_referenced_structural_gradient_matches_reoptimized_finite_difference() 
         getattr(minus, field)[1, 1] -= step
         finite_difference = (total_energy(plus) - total_energy(minus)) / (2.0 * step)
         assert np.isclose(analytic, finite_difference, rtol=3.0e-5, atol=3.0e-7)
+
+
+def test_explicit_initial_orbitals_skip_arbitrary_canonical_eigh(monkeypatch) -> None:
+    import holstein_peierls.spin_adapted.excitation_reference as reference
+    from holstein_peierls.hamiltonian import build_dense_hamiltonian
+
+    parameters, interaction = _problem()
+    lattice = _distorted_lattice()
+    one_body = build_dense_hamiltonian(lattice, parameters)
+    _, explicit = np.linalg.eigh(one_body)
+
+    def forbidden(_one_body):
+        raise AssertionError("_initial_orbitals must not run when both explicit seeds exist")
+
+    monkeypatch.setattr(reference, "_initial_orbitals", forbidden)
+    solved = reference.solve_referenced_excitation(
+        lattice,
+        parameters,
+        interaction,
+        n_closed=1,
+        multiplicity=SpinMultiplicity.TRIPLET,
+        initial_neutral_orbitals=explicit,
+        initial_excited_orbitals=explicit,
+        orbital_gradient_tolerance=1.0e-8,
+        orbital_max_iterations=800,
+    )
+    assert solved.neutral.diagnostics.converged
+    assert solved.excited.diagnostics.converged
