@@ -48,6 +48,7 @@ from enum import Enum
 
 import numpy as np
 
+from ..hamiltonian import build_dense_hamiltonian
 from ..lattice import LatticeState
 from ..parameters import StaticPolaronParameters
 from .excitation_reference import (
@@ -132,6 +133,53 @@ def _electronic_control_lattice(
         vx=np.asarray(lattice.vx, dtype=np.float64).copy(),
         vy=np.asarray(lattice.vy, dtype=np.float64).copy(),
     )
+
+
+def deterministic_root_seed_orbitals(
+    lattice: LatticeState,
+    parameters: StaticPolaronParameters,
+    *,
+    staggered_gap: float,
+    root_seed_id: int,
+    seed_amplitude_eV: float = 1.0e-8,
+    minimum_auxiliary_gap_eV: float = 1.0e-12,
+) -> tuple[np.ndarray, float]:
+    """Return deterministic auxiliary orbitals for one S1R root seed.
+
+    The diagonal seed term is used only to define the starting orbital basis.
+    The returned orbitals are subsequently optimized with the unperturbed
+    physical Hamiltonian.  No auxiliary seed energy or force is retained.
+    """
+    if seed_amplitude_eV <= 0.0:
+        raise ValueError("seed_amplitude_eV must be positive")
+    if minimum_auxiliary_gap_eV <= 0.0:
+        raise ValueError("minimum_auxiliary_gap_eV must be positive")
+    if not 0 <= int(root_seed_id) < parameters.n_sites:
+        raise ValueError("root_seed_id must lie in 0..n_sites-1")
+
+    electronic_lattice = _electronic_control_lattice(
+        lattice, parameters, staggered_gap
+    )
+    one_body = build_dense_hamiltonian(electronic_lattice, parameters)
+    n = parameters.n_sites
+    weights = (
+        (np.arange(n, dtype=np.float64).reshape(parameters.ny, parameters.nx) + 1.0)
+        / float(n + 1)
+        - 0.5
+    )
+    dy, dx = divmod(int(root_seed_id), parameters.nx)
+    weights = np.roll(weights, shift=(dy, dx), axis=(0, 1))
+    auxiliary = np.asarray(one_body, dtype=np.float64).copy()
+    auxiliary[np.diag_indices(n)] += seed_amplitude_eV * weights.reshape(-1)
+
+    eigenvalues, orbitals = np.linalg.eigh(auxiliary)
+    adjacent = np.diff(np.asarray(eigenvalues, dtype=np.float64))
+    minimum_gap = float(np.min(adjacent)) if adjacent.size else float("inf")
+    if not np.isfinite(minimum_gap) or minimum_gap <= minimum_auxiliary_gap_eV:
+        raise RuntimeError(
+            "deterministic root seed did not uniquely split the auxiliary spectrum"
+        )
+    return np.asarray(orbitals, dtype=np.float64), minimum_gap
 
 
 def isotropic_relaxation_seed(
@@ -299,11 +347,35 @@ def _solve_electronic_with_recovery(
     orbital_gradient_tolerance: float,
     orbital_max_iterations: int,
     staggered_gap: float,
+    root_seed_id: int | None = None,
+    root_seed_amplitude_eV: float = 1.0e-8,
 ) -> ReferencedExcitationState:
-    """Solve one geometry, recovering deterministically from a bad warm start."""
+    """Solve one geometry with optional deterministic S1R root recovery."""
     electronic_lattice = _electronic_control_lattice(
         lattice, parameters, staggered_gap
     )
+
+    deterministic_seed: np.ndarray | None = None
+    if root_seed_id is not None:
+        deterministic_seed, _ = deterministic_root_seed_orbitals(
+            lattice,
+            parameters,
+            staggered_gap=staggered_gap,
+            root_seed_id=root_seed_id,
+            seed_amplitude_eV=root_seed_amplitude_eV,
+        )
+
+    primary_neutral = (
+        neutral_orbitals
+        if neutral_orbitals is not None
+        else deterministic_seed
+    )
+    primary_excited = (
+        excited_orbitals
+        if excited_orbitals is not None
+        else deterministic_seed
+    )
+
     attempts: list[ReferencedExcitationState] = []
     primary = solve_referenced_excitation(
         electronic_lattice,
@@ -311,8 +383,8 @@ def _solve_electronic_with_recovery(
         interaction,
         n_closed=n_closed,
         multiplicity=multiplicity,
-        initial_neutral_orbitals=neutral_orbitals,
-        initial_excited_orbitals=excited_orbitals,
+        initial_neutral_orbitals=primary_neutral,
+        initial_excited_orbitals=primary_excited,
         orbital_gradient_tolerance=orbital_gradient_tolerance,
         orbital_max_iterations=orbital_max_iterations,
     )
@@ -320,37 +392,52 @@ def _solve_electronic_with_recovery(
     if primary.neutral.diagnostics.converged and primary.excited.diagnostics.converged:
         return primary
 
-    excited_seed = primary.neutral.orbitals if primary.neutral.diagnostics.converged else None
+    if deterministic_seed is not None:
+        recovery_neutral = deterministic_seed
+        recovery_excited = deterministic_seed
+    else:
+        recovery_neutral = None
+        recovery_excited = (
+            primary.neutral.orbitals
+            if primary.neutral.diagnostics.converged
+            else None
+        )
+
     recovery = solve_referenced_excitation(
         electronic_lattice,
         parameters,
         interaction,
         n_closed=n_closed,
         multiplicity=multiplicity,
-        initial_neutral_orbitals=None,
-        initial_excited_orbitals=excited_seed,
+        initial_neutral_orbitals=recovery_neutral,
+        initial_excited_orbitals=recovery_excited,
         orbital_gradient_tolerance=orbital_gradient_tolerance,
-        orbital_max_iterations=max(2 * orbital_max_iterations, orbital_max_iterations + 200),
+        orbital_max_iterations=max(
+            2 * orbital_max_iterations, orbital_max_iterations + 200
+        ),
     )
     attempts.append(recovery)
     combined = _combine_best_electronic_results(attempts)
     if combined.neutral.diagnostics.converged and combined.excited.diagnostics.converged:
         return combined
 
+    cold_neutral = deterministic_seed if deterministic_seed is not None else None
+    cold_excited = deterministic_seed if deterministic_seed is not None else None
     cold = solve_referenced_excitation(
         electronic_lattice,
         parameters,
         interaction,
         n_closed=n_closed,
         multiplicity=multiplicity,
-        initial_neutral_orbitals=None,
-        initial_excited_orbitals=None,
+        initial_neutral_orbitals=cold_neutral,
+        initial_excited_orbitals=cold_excited,
         orbital_gradient_tolerance=orbital_gradient_tolerance,
-        orbital_max_iterations=max(4 * orbital_max_iterations, orbital_max_iterations + 500),
+        orbital_max_iterations=max(
+            4 * orbital_max_iterations, orbital_max_iterations + 500
+        ),
     )
     attempts.append(cold)
     return _combine_best_electronic_results(attempts)
-
 
 def _harmonic_preconditioned_relaxation(
     parameters: StaticPolaronParameters,
@@ -363,6 +450,8 @@ def _harmonic_preconditioned_relaxation(
     orbital_max_iterations: int,
     gradient_convergence_criterion: float,
     staggered_gap: float,
+    root_seed_id: int | None = None,
+    root_seed_amplitude_eV: float = 1.0e-8,
     armijo_constant: float = 1.0e-4,
     line_search_shrink: float = 0.5,
     minimum_line_search_step: float = 2.0**-24,
@@ -387,6 +476,8 @@ def _harmonic_preconditioned_relaxation(
         orbital_gradient_tolerance=orbital_gradient_tolerance,
         orbital_max_iterations=orbital_max_iterations,
         staggered_gap=staggered_gap,
+        root_seed_id=root_seed_id,
+        root_seed_amplitude_eV=root_seed_amplitude_eV,
     )
     # No coordinate move has been made yet. This also lets an already stationary
     # seed satisfy the update gate without manufacturing a fictitious update.
@@ -534,6 +625,8 @@ def _rprop_relaxation(
     orbital_max_iterations: int,
     gradient_convergence_criterion: float,
     staggered_gap: float,
+    root_seed_id: int | None = None,
+    root_seed_amplitude_eV: float = 1.0e-8,
 ) -> StaticReferencedExcitationResult:
     """Relax the gapped referenced-excitation surface with robust RPROP.
 
@@ -561,6 +654,8 @@ def _rprop_relaxation(
         orbital_gradient_tolerance=orbital_gradient_tolerance,
         orbital_max_iterations=orbital_max_iterations,
         staggered_gap=staggered_gap,
+        root_seed_id=root_seed_id,
+        root_seed_amplitude_eV=root_seed_amplitude_eV,
     )
 
     final_update = 0.0
@@ -660,6 +755,8 @@ def relax_isotropic_spin_branch(
     gradient_convergence_criterion: float = 1.0e-6,
     staggered_gap: float = 2.0,
     structural_optimizer: str = "preconditioned",
+    root_seed_id: int | None = None,
+    root_seed_amplitude_eV: float = 1.0e-8,
 ) -> SpinRelaxationBranchResult:
     """Relax one half-filled singlet/triplet branch from a canonical gapped seed.
 
@@ -693,6 +790,8 @@ def relax_isotropic_spin_branch(
             orbital_max_iterations=orbital_max_iterations,
             gradient_convergence_criterion=gradient_convergence_criterion,
             staggered_gap=staggered_gap,
+            root_seed_id=root_seed_id,
+            root_seed_amplitude_eV=root_seed_amplitude_eV,
         )
     elif structural_optimizer == "rprop":
         result = _rprop_relaxation(
@@ -705,6 +804,8 @@ def relax_isotropic_spin_branch(
             orbital_max_iterations=orbital_max_iterations,
             gradient_convergence_criterion=gradient_convergence_criterion,
             staggered_gap=staggered_gap,
+            root_seed_id=root_seed_id,
+            root_seed_amplitude_eV=root_seed_amplitude_eV,
         )
     else:
         raise ValueError("structural_optimizer must be 'preconditioned' or 'rprop'")
