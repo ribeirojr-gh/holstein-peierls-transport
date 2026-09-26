@@ -205,3 +205,85 @@ def test_s1_rejects_unknown_structural_optimizer() -> None:
             seed="onsite",
             structural_optimizer="not-an-optimizer",
         )
+
+
+def test_s1r_all_16_root_seeds_are_orthonormal_and_unique_on_initial_geometries() -> None:
+    from holstein_peierls.spin_adapted import deterministic_root_seed_orbitals
+
+    parameters = IsotropicControlParameters().to_polaron_parameters(nx=4, ny=4)
+    for structural_seed in ("onsite", "bond_x", "bond_y"):
+        lattice = isotropic_relaxation_seed(
+            parameters, structural_seed, amplitude=1.0e-3
+        )
+        for root_seed_id in range(16):
+            orbitals, minimum_gap = deterministic_root_seed_orbitals(
+                lattice,
+                parameters,
+                staggered_gap=2.0,
+                root_seed_id=root_seed_id,
+            )
+            assert minimum_gap > 1.0e-12
+            np.testing.assert_allclose(
+                orbitals.T @ orbitals,
+                np.eye(parameters.n_sites),
+                atol=2.0e-12,
+            )
+
+
+def test_s1r_root_seed_input_validation() -> None:
+    from holstein_peierls.spin_adapted import deterministic_root_seed_orbitals
+
+    parameters = IsotropicControlParameters().to_polaron_parameters(nx=4, ny=4)
+    lattice = isotropic_relaxation_seed(parameters, "onsite", amplitude=1.0e-3)
+
+    for bad_id in (-1, 16):
+        with pytest.raises(ValueError, match="root_seed_id"):
+            deterministic_root_seed_orbitals(
+                lattice,
+                parameters,
+                staggered_gap=2.0,
+                root_seed_id=bad_id,
+            )
+    with pytest.raises(ValueError, match="seed_amplitude_eV"):
+        deterministic_root_seed_orbitals(
+            lattice,
+            parameters,
+            staggered_gap=2.0,
+            root_seed_id=0,
+            seed_amplitude_eV=0.0,
+        )
+
+
+def test_s1r_root_seeded_relaxation_smoke_preserves_strict_diagnostics() -> None:
+    from holstein_peierls.spin_adapted import (
+        SpinMultiplicity,
+        density_density_control_interaction,
+        relax_isotropic_spin_branch,
+    )
+
+    parameters = IsotropicControlParameters().to_polaron_parameters(
+        nx=4,
+        ny=4,
+        max_iterations=200,
+    )
+    interaction = density_density_control_interaction(
+        parameters,
+        onsite_u=0.525,
+        nearest_neighbor_v=0.08,
+    )
+    branch = relax_isotropic_spin_branch(
+        parameters,
+        interaction,
+        multiplicity=SpinMultiplicity.TRIPLET,
+        seed="onsite",
+        root_seed_id=0,
+        structural_optimizer="rprop",
+        orbital_gradient_tolerance=1.0e-8,
+        orbital_max_iterations=800,
+        gradient_convergence_criterion=1.0e-6,
+        staggered_gap=2.0,
+    )
+    assert branch.result.diagnostics.converged
+    assert branch.result.diagnostics.final_max_update < 1.0e-8
+    assert branch.result.diagnostics.final_max_gradient < 1.0e-6
+    assert abs(branch.result.state.particle_number_change) < 1.0e-10
