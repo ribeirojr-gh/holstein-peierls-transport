@@ -36,6 +36,8 @@ jobs:
           python -m pip install -e . --no-deps
       - name: Record provenance
         run: |
+          CLEAN_STATUS="$(git status --porcelain)"
+          test -z "$CLEAN_STATUS"
           mkdir -p s2-validation
           {
             echo "GITHUB_SHA=$GITHUB_SHA"
@@ -47,7 +49,7 @@ jobs:
             echo "OPENBLAS_NUM_THREADS=$OPENBLAS_NUM_THREADS"
             echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
             echo "MKL_NUM_THREADS=$MKL_NUM_THREADS"
-            git status --porcelain
+            echo "git_status_clean=true"
           } | tee s2-validation/provenance.txt
       - name: Pycompile S2 drivers
         run: |
