@@ -56,7 +56,7 @@ jobs:
           python -m py_compile             experiments/s2_polaron_regression.py             experiments/s2_static_aggregate.py             src/holstein_peierls/s2_static_regression.py
       - name: Focused S2 tests
         run: |
-          pytest -q             tests/test_s2_static_regression.py             tests/test_s1r_root_manifold.py             tests/test_exciton_static.py             tests/test_long_range_coulomb.py
+          pytest -q tests/test_s2_static_regression.py tests/test_s1r_root_manifold.py tests/test_exciton_solver.py tests/test_exciton_relaxation.py tests/test_exciton_branches.py tests/test_long_range_coulomb.py
       - name: Full repository test suite
         run: pytest
       - name: Upload validation artifact
