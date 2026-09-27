@@ -9,6 +9,7 @@ __pycache__/
 
 # Local validation artifacts
 *-local-validation/
+s3-local-runs/
 *.zip
 
 # Editor / OS noise

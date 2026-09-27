@@ -213,8 +213,11 @@ def main() -> None:
     parser.add_argument("--branch", choices=BRANCHES, required=True)
     parser.add_argument("--j0x", type=float, default=0.100)
     parser.add_argument("--j0y", type=float, default=0.015)
+    parser.add_argument("--alpha-intra", type=float, default=3.0)
     parser.add_argument("--alpha-x", type=float, default=0.10)
     parser.add_argument("--alpha-y", type=float, default=0.12)
+    parser.add_argument("--k1", type=float, default=16.51)
+    parser.add_argument("--k2", type=float, default=0.51)
     parser.add_argument("--long-range", action="store_true")
     parser.add_argument("--ax", type=float)
     parser.add_argument("--ay", type=float)
@@ -236,8 +239,11 @@ def main() -> None:
         nx=args.size,
         ny=args.size,
         polaron_position=center_position(args.size),
+        k1=args.k1,
+        k2=args.k2,
         j0x=args.j0x,
         j0y=args.j0y,
+        alpha_intra=args.alpha_intra,
         alpha_interx=args.alpha_x,
         alpha_intery=args.alpha_y,
     )
@@ -283,6 +289,9 @@ def main() -> None:
         "size": args.size,
         "Jx_eV": args.j0x,
         "Jy_eV": args.j0y,
+        "K1_eV_per_A2": args.k1,
+        "K2_eV_per_A2": args.k2,
+        "alpha_intra_eV_per_A": args.alpha_intra,
         "alpha_x_eV_per_A": args.alpha_x,
         "alpha_y_eV_per_A": args.alpha_y,
         "U_eV": args.u,
