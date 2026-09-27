@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# S1R local fallback: deterministic spin-adapted singlet root-manifold audit.
-# GitHub Actions is the primary execution environment. The exact numerical
-# environment is pinned to match the preregistered S1R production workflow.
+# S2 local fallback: unified static-sector regression.
+# GitHub Actions is the primary execution environment.
 
 python3 -m venv .venv
 source .venv/bin/activate
@@ -14,9 +13,8 @@ python -m pip install -e . --no-deps
 export OPENBLAS_NUM_THREADS=1
 export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
-export PYTHONUNBUFFERED=1
 
-python scripts/run_s1r_local_validation.py
+python scripts/run_s2_local_validation.py
 
 echo
-printf 'S1R completed. Results are under: s1r-local-validation/\n'
+printf 'S2 completed. Results are under: s2-local-validation/\n'
