@@ -77,6 +77,15 @@ def test_manifest_rejects_incomplete_seed_ensemble():
         validate_manifest(payload)
 
 
+def test_screen_stage_is_allowed_but_marked_nonproduction():
+    payload = manifest()
+    payload["stage"] = "screen"
+    payload["grid"]["coupling_scale"] = [1.0]
+    records = [record(branch, -0.59) for branch in BRANCHES]
+    summary = summarize_campaign(payload, records)
+    assert summary["interpretation_guard"]["nonproduction_results_are_not_paper_data"]
+
+
 def test_topology_uses_observables_not_seed_label():
     item = record("onsite", -1.0)
     assert classify_topology(item) == "diagonal"

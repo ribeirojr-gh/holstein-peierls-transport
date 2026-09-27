@@ -99,3 +99,20 @@ Each completed milestone is committed to the S3 GitHub branch.  Raw local run
 artifacts are packaged with checksums and uploaded to the project's
 `reference-runs` Google Drive hierarchy; generated run directories are not
 committed to Git.
+
+## Post-pilot 12x12 screen
+
+After the preregistered pilot completed, the next prospective manifest was
+frozen as `s3-paper1-bipolaron-screen-v1`.  It uses:
+
+- `U = {0.525, 0.750, 1.000} eV`;
+- `V1 = {0.000, 0.004, 0.016, 0.080, 0.320} eV`;
+- `g = {0.8, 0.9, 1.0, 1.1}`;
+- the same complete five-seed ensemble;
+- a periodic 12x12 lattice.
+
+This gives 60 parameter points and 300 independent branches.  The low-meV V1
+values resolve the known isotropic axial/diagonal region, the intermediate U
+value tests topology continuity, and the four coupling levels bracket the
+weak-coupling separated pilot control.  The screen selects where to spend the
+substantially larger 20x20 and 40x40 budgets; it is not paper data.

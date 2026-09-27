@@ -14,7 +14,12 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
     """Validate the compact, prospective S3 bipolaron campaign manifest."""
     if manifest.get("schema_version") != 1:
         raise ValueError("S3 manifest schema_version must be 1")
-    if manifest.get("stage") not in {"pilot", "production", "finite_size"}:
+    if manifest.get("stage") not in {
+        "pilot",
+        "screen",
+        "production",
+        "finite_size",
+    }:
         raise ValueError("S3 manifest stage is unsupported")
 
     sizes = manifest.get("lattice_sizes")
@@ -264,6 +269,7 @@ def summarize_campaign(
             "seed_labels_are_not_phases": True,
             "finite_size_status_must_pass_before_boundary_promotion": True,
             "linear_peierls_gate_is_required_for_quantitative_use": True,
-            "pilot_results_are_not_paper_data": manifest["stage"] == "pilot",
+            "nonproduction_results_are_not_paper_data": manifest["stage"]
+            in {"pilot", "screen"},
         },
     }
