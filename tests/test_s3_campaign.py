@@ -96,6 +96,7 @@ def test_aggregate_promotes_energy_minimum_and_preserves_seed_as_metadata():
     assert summary["complete"]
     assert point["selected_seed"] == "onsite"
     assert point["classification"] == "diagonal"
+    assert point["binding_status"] == "robust"
     assert point["binding_vs_separated_eV"] == pytest.approx(0.01)
     assert point["quantitative_at_this_size"]
     assert point["finite_size_status"] == "pending"
@@ -115,6 +116,45 @@ def test_aggregate_marks_subthreshold_binding_marginal_and_peierls_failure():
     assert point["classification"] == "marginal_diagonal"
     assert not point["linear_peierls_gate"]
     assert not point["quantitative_at_this_size"]
+
+
+def test_aggregate_collapses_xy_orientation_to_axial_for_isotropic_model():
+    payload = manifest()
+    payload["grid"]["coupling_scale"] = [1.0]
+    records = [record(branch, -0.59) for branch in BRANCHES]
+    for item in records:
+        if item["branch"] == "intersite_y":
+            item.update(P_nn=0.90, P_nn_x=0.01, P_nn_y=0.89, P_diagonal=0.02)
+            item["total_energy_eV"] = -0.61
+        elif item["branch"] == "separated":
+            item["total_energy_eV"] = -0.60
+    point = summarize_campaign(payload, records)["points"][0]
+    assert point["raw_observable_topology"] == "intersite_y"
+    assert point["observable_topology"] == "axial"
+    assert point["classification"] == "axial"
+
+
+def test_separated_topology_is_not_called_bound_from_seed_energy_difference():
+    payload = manifest()
+    payload["grid"]["coupling_scale"] = [1.0]
+    records = [
+        record(
+            branch,
+            -0.59,
+            p0=0.001,
+            pnnx=0.01,
+            pnny=0.01,
+            pdiag=0.02,
+            mean_r=3.2,
+        )
+        for branch in BRANCHES
+    ]
+    records[0]["total_energy_eV"] = -0.63
+    records[-1]["total_energy_eV"] = -0.60
+    point = summarize_campaign(payload, records)["points"][0]
+    assert point["binding_vs_separated_eV"] == pytest.approx(0.03)
+    assert point["classification"] == "separated"
+    assert point["binding_status"] == "not_applicable_separated_topology"
 
 
 def test_aggregate_rejects_duplicate_records():

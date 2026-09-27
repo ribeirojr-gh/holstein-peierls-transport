@@ -60,9 +60,16 @@ derived from final pair observables, not its seed:
 - separated: total local probability below 0.10 and mean separation above two
   sites, or no energy gain above the separated branch within `1e-8 eV`;
 - onsite, intersite-x, intersite-y, or diagonal: the corresponding probability
-  channel is largest and at least 0.25;
+  channel is largest and at least 0.25; for the fixed isotropic Hamiltonian,
+  x/y intersite orientations are reported as the single symmetry-equivalent
+  `axial` phase;
 - mixed: no local channel reaches 0.25;
 - marginal: positive binding below 5 meV.
+
+If the final observables describe a separated state, it remains classified as
+separated even when it lies below the particular separated-seed stationary
+solution in a small cell.  Such a seed-energy difference is retained for
+diagnosis but is not interpreted as a pair-binding energy.
 
 A point is quantitatively admissible at its current size only when all five
 branches converge and the promoted minimum satisfies

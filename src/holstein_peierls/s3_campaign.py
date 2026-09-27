@@ -163,6 +163,15 @@ def summarize_campaign(
     tie = float(criteria["energy_tie_tolerance_eV"])
     robust = float(criteria["robust_binding_threshold_eV"])
     peierls_max = float(criteria["linear_peierls_ratio_max"])
+    model = manifest["model"]
+    isotropic_xy = bool(
+        abs(float(model["Jx_eV"]) - float(model["Jy_eV"])) <= 1.0e-14
+        and abs(
+            float(model["base_alpha_x_eV_per_A"])
+            - float(model["base_alpha_y_eV_per_A"])
+        )
+        <= 1.0e-14
+    )
     points: list[dict[str, Any]] = []
     for point_key in sorted(grouped):
         branches = sorted(grouped[point_key], key=lambda item: str(item["branch"]))
@@ -191,13 +200,25 @@ def summarize_campaign(
         separated = next(item for item in branches if item["branch"] == "separated")
         best = min(branches, key=lambda item: float(item["total_energy_eV"]))
         binding = float(separated["total_energy_eV"]) - float(best["total_energy_eV"])
-        observable_topology = classify_topology(best)
-        if binding <= tie:
+        raw_observable_topology = classify_topology(best)
+        observable_topology = (
+            "axial"
+            if isotropic_xy
+            and raw_observable_topology in {"intersite_x", "intersite_y"}
+            else raw_observable_topology
+        )
+        if observable_topology == "separated":
             classification = "separated"
+            binding_status = "not_applicable_separated_topology"
+        elif binding <= tie:
+            classification = "separated"
+            binding_status = "unresolved_or_unbound"
         elif binding < robust:
             classification = f"marginal_{observable_topology}"
+            binding_status = "marginal"
         else:
             classification = observable_topology
+            binding_status = "robust"
         linear_peierls = bool(
             float(best["max_delta_tx_over_Jx"]) <= peierls_max
             and float(best["max_delta_ty_over_Jy"]) <= peierls_max
@@ -213,6 +234,8 @@ def summarize_campaign(
                 "selected_seed": str(best["branch"]),
                 "classification": classification,
                 "observable_topology": observable_topology,
+                "raw_observable_topology": raw_observable_topology,
+                "binding_status": binding_status,
                 "best_energy_eV": float(best["total_energy_eV"]),
                 "separated_energy_eV": float(separated["total_energy_eV"]),
                 "binding_vs_separated_eV": binding,

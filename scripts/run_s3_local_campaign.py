@@ -30,6 +30,13 @@ def _manifest_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _git_output(*arguments: str) -> str:
+    process = subprocess.run(
+        ["git", *arguments], capture_output=True, text=True, check=False
+    )
+    return process.stdout.strip() if process.returncode == 0 else "unavailable"
+
+
 def _branch_command(task: dict, manifest: dict, output: Path) -> list[str]:
     model = manifest["model"]
     numerical = manifest["numerical"]
@@ -133,6 +140,9 @@ def main() -> None:
         "numpy": np.__version__,
         "scipy": scipy.__version__,
         "executable": sys.executable,
+        "git_commit": _git_output("rev-parse", "HEAD"),
+        "git_branch": _git_output("branch", "--show-current"),
+        "git_status": _git_output("status", "--short"),
         "thread_environment": {
             name: os.environ.get(name)
             for name in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
