@@ -1,0 +1,228 @@
+name: s2-unified-static-sector-regression
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - isotropic-polaron-barrier
+    paths:
+      - '.github/workflows/s2-unified-static-sector-regression.yml'
+
+concurrency:
+  group: s2-unified-static-sector-regression
+  cancel-in-progress: false
+
+env:
+  OPENBLAS_NUM_THREADS: '1'
+  OMP_NUM_THREADS: '1'
+  MKL_NUM_THREADS: '1'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.14'
+      - name: Install exact numerical environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'numpy==2.5.3' 'scipy==1.18.1' 'pytest==9.1.1'
+          python -m pip install -e . --no-deps
+      - name: Record provenance
+        run: |
+          mkdir -p s2-validation
+          {
+            echo "GITHUB_SHA=$GITHUB_SHA"
+            echo "GITHUB_REF=$GITHUB_REF"
+            echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+            echo "GITHUB_RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT"
+            python --version
+            python -c 'import numpy as np, scipy; print("numpy", np.__version__); print("scipy", scipy.__version__)'
+            echo "OPENBLAS_NUM_THREADS=$OPENBLAS_NUM_THREADS"
+            echo "OMP_NUM_THREADS=$OMP_NUM_THREADS"
+            echo "MKL_NUM_THREADS=$MKL_NUM_THREADS"
+            git status --porcelain
+          } | tee s2-validation/provenance.txt
+      - name: Pycompile S2 drivers
+        run: |
+          python -m py_compile             experiments/s2_polaron_regression.py             experiments/s2_static_aggregate.py             src/holstein_peierls/s2_static_regression.py
+      - name: Focused S2 tests
+        run: |
+          pytest -q             tests/test_s2_static_regression.py             tests/test_s1r_root_manifold.py             tests/test_exciton_static.py             tests/test_long_range_coulomb.py
+      - name: Full repository test suite
+        run: pytest
+      - name: Upload validation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s2-validation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: s2-validation/
+          retention-days: 90
+
+  polaron:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.14'
+      - name: Install exact numerical environment
+        run: |
+          python -m pip install 'numpy==2.5.3' 'scipy==1.18.1'
+          python -m pip install -e . --no-deps
+      - name: Run strict one-polaron anchor
+        run: |
+          mkdir -p s2-polaron
+          python experiments/s2_polaron_regression.py             --output s2-polaron/s2-polaron.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s2-polaron-${{ github.run_id }}-${{ github.run_attempt }}
+          path: s2-polaron/
+          retention-days: 90
+
+  bipolaron:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.14'
+      - name: Install exact numerical environment
+        run: |
+          python -m pip install 'numpy==2.5.3' 'scipy==1.18.1'
+          python -m pip install -e . --no-deps
+      - name: Run strict 40x40 bipolaron anchor
+        run: |
+          mkdir -p s2-bipolaron
+          python experiments/bipolaron_branch_benchmark_seeded.py             --size 40             --u 1.0             --v1 0.0             --branch intersite_x             --j0x 0.100             --j0y 0.015             --alpha-x 0.10             --alpha-y 0.12             --max-iterations 1200             --output s2-bipolaron
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s2-bipolaron-${{ github.run_id }}-${{ github.run_attempt }}
+          path: s2-bipolaron/
+          retention-days: 90
+
+  exciton:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.14'
+      - name: Install exact numerical environment
+        run: |
+          python -m pip install 'numpy==2.5.3' 'scipy==1.18.1'
+          python -m pip install -e . --no-deps
+      - name: Run strict 20x20 spin-blind exciton anchors
+        run: |
+          mkdir -p s2-exciton
+          python experiments/exciton_reference_branch_benchmark.py             --size 20             --onsite-attraction 0.525             --max-iterations 1600             --mode frenkel             --mode diagonal             --output s2-exciton/s2-exciton.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s2-exciton-${{ github.run_id }}-${{ github.run_attempt }}
+          path: s2-exciton/
+          retention-days: 90
+
+  spin:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - optimizer: preconditioned
+            multiplicity: singlet
+            structural_seed: onsite
+            root_seed_id: 9
+          - optimizer: rprop
+            multiplicity: singlet
+            structural_seed: onsite
+            root_seed_id: 8
+          - optimizer: preconditioned
+            multiplicity: triplet
+            structural_seed: bond_x
+            root_seed_id: 0
+          - optimizer: rprop
+            multiplicity: triplet
+            structural_seed: onsite
+            root_seed_id: 0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.14'
+      - name: Install exact numerical environment
+        run: |
+          python -m pip install 'numpy==2.5.3' 'scipy==1.18.1'
+          python -m pip install -e . --no-deps
+      - name: Run S1R regression anchor
+        run: |
+          mkdir -p s2-spin
+          python experiments/s1r_root_branch.py             --structural-optimizer '${{ matrix.optimizer }}'             --multiplicity '${{ matrix.multiplicity }}'             --structural-seed '${{ matrix.structural_seed }}'             --root-seed-id '${{ matrix.root_seed_id }}'             --output 's2-spin/s2-spin-${{ matrix.optimizer }}-${{ matrix.multiplicity }}.json'             --arrays 's2-spin/s2-spin-${{ matrix.optimizer }}-${{ matrix.multiplicity }}.npz'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s2-spin-${{ matrix.optimizer }}-${{ matrix.multiplicity }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: s2-spin/
+          retention-days: 90
+
+  aggregate:
+    if: always()
+    needs: [validate, polaron, bipolaron, exciton, spin]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.14'
+      - name: Install exact numerical environment
+        run: |
+          python -m pip install 'numpy==2.5.3' 'scipy==1.18.1'
+          python -m pip install -e . --no-deps
+      - name: Download sector artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: s2-*
+          path: s2-input
+      - name: Aggregate locked S2 sectors
+        run: |
+          mkdir -p s2-aggregate
+          python experiments/s2_static_aggregate.py             --input-dir s2-input             --output s2-aggregate/s2-aggregate.json             --markdown s2-aggregate/s2-aggregate.md             --full-pytest-passed
+      - name: Record aggregate provenance
+        if: always()
+        run: |
+          {
+            echo "GITHUB_SHA=$GITHUB_SHA"
+            echo "GITHUB_REF=$GITHUB_REF"
+            echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+            echo "GITHUB_RUN_ATTEMPT=$GITHUB_RUN_ATTEMPT"
+            echo "validate_result=${{ needs.validate.result }}"
+            echo "polaron_result=${{ needs.polaron.result }}"
+            echo "bipolaron_result=${{ needs.bipolaron.result }}"
+            echo "exciton_result=${{ needs.exciton.result }}"
+            echo "spin_result=${{ needs.spin.result }}"
+            git status --porcelain
+          } > s2-aggregate/provenance.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s2-aggregate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: s2-aggregate/
+          retention-days: 90
+          compression-level: 6
