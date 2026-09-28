@@ -130,3 +130,14 @@ that failed the linear-Peierls gate at 12x12 for size diagnostics, and includes
 one `g=0.8` separated control.  Every point remains subject to the same strict
 stationarity and linear-Peierls criteria.  Surviving topology boundaries then
 advance to 40x40; all other results remain finite-size-referenced 20x20 data.
+
+## Targeted 40x40 finite-size campaign
+
+The next frozen manifest is
+`configs/s3-paper1-bipolaron-finite-size-40x40-v1.json`.  It targets 16 points
+around the surviving onsite, axial, diagonal, and separated boundaries, plus
+the marginal-binding control rows.  At each point it repeats the observed
+bound-topology seed and the same-cell separated seed (32 branch relaxations in
+total).  It is explicitly a targeted finite-size check, not a repeat of the
+global five-seed topology search; promotion remains conditional on convergence,
+the linear-Peierls gate, and agreement with the 20x20 observables.

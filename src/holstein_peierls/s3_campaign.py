@@ -54,6 +54,21 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
                 raise ValueError(
                     f"grid.slices[{index}].coupling_scale must be positive and finite"
                 )
+            if "branches" in row:
+                if manifest["stage"] != "finite_size":
+                    raise ValueError("per-slice branches are supported only for finite_size")
+                selected = row["branches"]
+                if (
+                    not isinstance(selected, list)
+                    or not selected
+                    or len(set(selected)) != len(selected)
+                    or any(branch not in BRANCHES for branch in selected)
+                    or "separated" not in selected
+                ):
+                    raise ValueError(
+                        f"grid.slices[{index}].branches must be a unique S3 subset "
+                        "including separated"
+                    )
     else:
         for name in ("U_eV", "V1_eV", "coupling_scale"):
             values = grid.get(name)
@@ -110,23 +125,24 @@ def expand_tasks(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     model = manifest["model"]
     tasks: list[dict[str, Any]] = []
     grid = manifest["grid"]
+    branches = manifest["branches"]
     if "slices" in grid:
         parameter_points = [
-            (float(row["coupling_scale"]), float(u), float(v1))
+            (float(row["coupling_scale"]), float(u), float(v1), row.get("branches", branches))
             for row in grid["slices"]
             for u in row["U_eV"]
             for v1 in row["V1_eV"]
         ]
     else:
         parameter_points = [
-            (float(coupling_scale), float(u), float(v1))
+            (float(coupling_scale), float(u), float(v1), branches)
             for coupling_scale in grid["coupling_scale"]
             for u in grid["U_eV"]
             for v1 in grid["V1_eV"]
         ]
     for size in manifest["lattice_sizes"]:
-        for coupling_scale, hubbard_u, v1 in parameter_points:
-            for branch in manifest["branches"]:
+        for coupling_scale, hubbard_u, v1, point_branches in parameter_points:
+            for branch in point_branches:
                 tasks.append(
                     {
                         "size": int(size),
@@ -181,10 +197,16 @@ def summarize_campaign(
 ) -> dict[str, Any]:
     """Aggregate all branch records into observable-classified parameter points."""
     validate_manifest(manifest)
+    expected_tasks = expand_tasks(manifest)
     expected = {
         (task["size"], task["coupling_scale"], task["U_eV"], task["V1_eV"], task["branch"])
-        for task in expand_tasks(manifest)
+        for task in expected_tasks
     }
+    required_by_point: dict[tuple[int, float, float, float], set[str]] = defaultdict(set)
+    for task in expected_tasks:
+        required_by_point[(task["size"], task["coupling_scale"], task["U_eV"], task["V1_eV"])].add(
+            task["branch"]
+        )
     indexed: dict[tuple[int, float, float, float, str], dict[str, Any]] = {}
     for record in records:
         key = (
@@ -223,7 +245,8 @@ def summarize_campaign(
     for point_key in sorted(grouped):
         branches = sorted(grouped[point_key], key=lambda item: str(item["branch"]))
         labels = {str(item["branch"]) for item in branches}
-        complete = labels == set(BRANCHES)
+        required_branches = required_by_point[point_key]
+        complete = labels == required_branches
         all_converged = complete and all(
             bool(item["converged"])
             and float(item["final_max_update_A"]) < 1.0e-8
@@ -237,6 +260,7 @@ def summarize_campaign(
                     "coupling_scale": point_key[1],
                     "U_eV": point_key[2],
                     "V1_eV": point_key[3],
+                    "required_branches": sorted(required_branches),
                     "complete": False,
                     "all_branches_converged": False,
                     "classification": "incomplete",
@@ -276,6 +300,7 @@ def summarize_campaign(
                 "coupling_scale": point_key[1],
                 "U_eV": point_key[2],
                 "V1_eV": point_key[3],
+                "required_branches": sorted(required_branches),
                 "complete": True,
                 "all_branches_converged": all_converged,
                 "selected_seed": str(best["branch"]),
@@ -313,5 +338,9 @@ def summarize_campaign(
             "linear_peierls_gate_is_required_for_quantitative_use": True,
             "nonproduction_results_are_not_paper_data": manifest["stage"]
             in {"pilot", "screen"},
+            "finite_size_branch_subsets_are_targeted_checks_not_a_new_global_search": manifest[
+                "stage"
+            ]
+            == "finite_size",
         },
     }

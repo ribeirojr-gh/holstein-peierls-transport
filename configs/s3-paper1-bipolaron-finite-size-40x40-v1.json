@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "campaign_id": "s3-paper1-bipolaron-finite-size-40x40-v1",
+  "stage": "finite_size",
+  "lattice_sizes": [40],
+  "model": {
+    "geometry": "bandwidth-matched isotropic square",
+    "boundary_conditions": "periodic",
+    "Jx_eV": 0.0575,
+    "Jy_eV": 0.0575,
+    "K1_eV_per_A2": 16.51,
+    "K2_eV_per_A2": 0.51,
+    "base_alpha_intra_eV_per_A": 3.0,
+    "base_alpha_x_eV_per_A": 0.1,
+    "base_alpha_y_eV_per_A": 0.1,
+    "coupling_scale_definition": "global multiplier applied to alpha_intra, alpha_x, and alpha_y",
+    "interaction": "onsite U plus isotropic nearest-neighbour V1",
+    "long_range_coulomb": false
+  },
+  "grid": {
+    "selection_basis": "targeted 40x40 checks of 20x20 topology and binding brackets; only each observed bound-topology seed plus the same-cell separated seed is repeated, so this is not a global five-seed search",
+    "slices": [
+      {"coupling_scale": 1.0, "U_eV": [0.525], "V1_eV": [0.24, 0.32], "branches": ["onsite", "separated"]},
+      {"coupling_scale": 1.0, "U_eV": [0.75], "V1_eV": [0.004], "branches": ["intersite_x", "separated"]},
+      {"coupling_scale": 1.0, "U_eV": [0.75], "V1_eV": [0.016, 0.04], "branches": ["diagonal", "separated"]},
+      {"coupling_scale": 1.0, "U_eV": [1.0], "V1_eV": [0.0], "branches": ["intersite_x", "separated"]},
+      {"coupling_scale": 1.0, "U_eV": [1.0], "V1_eV": [0.004, 0.016], "branches": ["diagonal", "separated"]},
+      {"coupling_scale": 1.1, "U_eV": [1.0], "V1_eV": [0.0], "branches": ["intersite_x", "separated"]},
+      {"coupling_scale": 1.1, "U_eV": [1.0], "V1_eV": [0.008, 0.016], "branches": ["diagonal", "separated"]},
+      {"coupling_scale": 0.9, "U_eV": [0.75], "V1_eV": [0.0], "branches": ["intersite_x", "separated"]},
+      {"coupling_scale": 0.9, "U_eV": [0.75], "V1_eV": [0.008, 0.04], "branches": ["diagonal", "separated"]},
+      {"coupling_scale": 1.1, "U_eV": [0.75], "V1_eV": [0.016, 0.04], "branches": ["diagonal", "separated"]}
+    ]
+  },
+  "branches": ["onsite", "intersite_x", "intersite_y", "diagonal", "separated"],
+  "numerical": {
+    "max_iterations": 1200,
+    "coordinate_update_tolerance_A": 1e-08,
+    "gradient_tolerance_eV_per_A": 1e-06,
+    "eigensolver_tolerance": 1e-11,
+    "thread_count": 1
+  },
+  "classification": {
+    "energy_tie_tolerance_eV": 1e-08,
+    "robust_binding_threshold_eV": 0.005,
+    "linear_peierls_ratio_max": 0.25
+  },
+  "finite_size_policy": {
+    "role": "targeted 40x40 size confirmation for selected 20x20 bipolaron boundaries",
+    "reference_campaign": "s3-paper1-bipolaron-production-20x20-v1",
+    "retain_all_converged_branches": true,
+    "global_five_seed_search_repeated": false,
+    "promotion_requires_same_cell_separated_branch": true
+  }
+}
