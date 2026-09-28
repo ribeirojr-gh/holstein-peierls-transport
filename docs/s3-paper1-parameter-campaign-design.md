@@ -116,3 +116,17 @@ values resolve the known isotropic axial/diagonal region, the intermediate U
 value tests topology continuity, and the four coupling levels bracket the
 weak-coupling separated pilot control.  The screen selects where to spend the
 substantially larger 20x20 and 40x40 budgets; it is not paper data.
+
+## Frozen 20x20 production map
+
+The 12x12 screen selects a targeted 20x20 matrix in
+`configs/s3-paper1-bipolaron-production-20x20-v1.json`.  Its ten parameter
+slices cover 48 parameter points and 240 independently relaxed branches.
+Each slice retains the complete five-seed ensemble.
+
+The map refines the low-meV axial/diagonal boundaries, brackets the onsite
+dissociation region at `U=0.525 eV`, retains the `g=1.1, U=0.75 eV` points
+that failed the linear-Peierls gate at 12x12 for size diagnostics, and includes
+one `g=0.8` separated control.  Every point remains subject to the same strict
+stationarity and linear-Peierls criteria.  Surviving topology boundaries then
+advance to 40x40; all other results remain finite-size-referenced 20x20 data.

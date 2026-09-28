@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "campaign_id": "s3-paper1-bipolaron-production-20x20-v1",
+  "stage": "production",
+  "lattice_sizes": [20],
+  "model": {
+    "geometry": "bandwidth-matched isotropic square",
+    "boundary_conditions": "periodic",
+    "Jx_eV": 0.0575,
+    "Jy_eV": 0.0575,
+    "K1_eV_per_A2": 16.51,
+    "K2_eV_per_A2": 0.51,
+    "base_alpha_intra_eV_per_A": 3.0,
+    "base_alpha_x_eV_per_A": 0.1,
+    "base_alpha_y_eV_per_A": 0.1,
+    "coupling_scale_definition": "global multiplier applied to alpha_intra, alpha_x, and alpha_y",
+    "interaction": "onsite U plus isotropic nearest-neighbour V1",
+    "long_range_coulomb": false
+  },
+  "grid": {
+    "selection_basis": "all observed topology changes from the frozen 12x12 screen, with low-meV refinement for axial/diagonal transitions and a single weak-coupling separated control",
+    "slices": [
+      {"coupling_scale": 0.9, "U_eV": [0.525], "V1_eV": [0.0, 0.004, 0.008, 0.016, 0.04, 0.08]},
+      {"coupling_scale": 0.9, "U_eV": [0.75], "V1_eV": [0.0, 0.004, 0.008, 0.016, 0.04, 0.08]},
+      {"coupling_scale": 0.9, "U_eV": [1.0], "V1_eV": [0.0, 0.002, 0.004, 0.008, 0.016]},
+      {"coupling_scale": 1.0, "U_eV": [0.525], "V1_eV": [0.08, 0.12, 0.16, 0.24, 0.32]},
+      {"coupling_scale": 1.0, "U_eV": [0.75], "V1_eV": [0.0, 0.004, 0.008, 0.016, 0.04, 0.08]},
+      {"coupling_scale": 1.0, "U_eV": [1.0], "V1_eV": [0.0, 0.002, 0.004, 0.008, 0.016]},
+      {"coupling_scale": 1.1, "U_eV": [0.525], "V1_eV": [0.08, 0.16, 0.24, 0.32]},
+      {"coupling_scale": 1.1, "U_eV": [0.75], "V1_eV": [0.0, 0.004, 0.016, 0.04, 0.08]},
+      {"coupling_scale": 1.1, "U_eV": [1.0], "V1_eV": [0.0, 0.002, 0.004, 0.008, 0.016]},
+      {"coupling_scale": 0.8, "U_eV": [1.0], "V1_eV": [0.0]}
+    ]
+  },
+  "branches": ["onsite", "intersite_x", "intersite_y", "diagonal", "separated"],
+  "numerical": {
+    "max_iterations": 1200,
+    "coordinate_update_tolerance_A": 1e-8,
+    "gradient_tolerance_eV_per_A": 1e-6,
+    "eigensolver_tolerance": 1e-11,
+    "thread_count": 1
+  },
+  "classification": {
+    "energy_tie_tolerance_eV": 1e-8,
+    "robust_binding_threshold_eV": 0.005,
+    "linear_peierls_ratio_max": 0.25
+  },
+  "finite_size_policy": {
+    "role": "20x20 production map and finite-size comparison against 12x12",
+    "boundary_validation_size": 40,
+    "promote_only_after_40x40_boundary_confirmation": true,
+    "retain_all_converged_branches": true
+  }
+}

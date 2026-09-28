@@ -29,16 +29,45 @@ def validate_manifest(manifest: dict[str, Any]) -> None:
         raise ValueError("lattice_sizes must contain even integers >= 4")
 
     grid = manifest.get("grid", {})
-    for name in ("U_eV", "V1_eV", "coupling_scale"):
-        values = grid.get(name)
-        if not isinstance(values, list) or not values:
-            raise ValueError(f"grid.{name} must be a non-empty list")
-        if any(not isinstance(value, (int, float)) or not isfinite(value) for value in values):
-            raise ValueError(f"grid.{name} must contain finite numbers")
-    if any(value < 0.0 for value in grid["U_eV"] + grid["V1_eV"]):
-        raise ValueError("U_eV and V1_eV must be non-negative")
-    if any(value <= 0.0 for value in grid["coupling_scale"]):
-        raise ValueError("coupling_scale must be positive")
+    if "slices" in grid:
+        slices = grid.get("slices")
+        if not isinstance(slices, list) or not slices:
+            raise ValueError("grid.slices must be a non-empty list")
+        for index, row in enumerate(slices):
+            for name in ("U_eV", "V1_eV"):
+                values = row.get(name)
+                if not isinstance(values, list) or not values:
+                    raise ValueError(f"grid.slices[{index}].{name} must be non-empty")
+                if any(
+                    not isinstance(value, (int, float)) or not isfinite(value)
+                    for value in values
+                ):
+                    raise ValueError(f"grid.slices[{index}].{name} must be finite")
+                if any(value < 0.0 for value in values):
+                    raise ValueError(f"grid.slices[{index}].{name} must be non-negative")
+            coupling = row.get("coupling_scale")
+            if (
+                not isinstance(coupling, (int, float))
+                or not isfinite(coupling)
+                or coupling <= 0.0
+            ):
+                raise ValueError(
+                    f"grid.slices[{index}].coupling_scale must be positive and finite"
+                )
+    else:
+        for name in ("U_eV", "V1_eV", "coupling_scale"):
+            values = grid.get(name)
+            if not isinstance(values, list) or not values:
+                raise ValueError(f"grid.{name} must be a non-empty list")
+            if any(
+                not isinstance(value, (int, float)) or not isfinite(value)
+                for value in values
+            ):
+                raise ValueError(f"grid.{name} must contain finite numbers")
+        if any(value < 0.0 for value in grid["U_eV"] + grid["V1_eV"]):
+            raise ValueError("U_eV and V1_eV must be non-negative")
+        if any(value <= 0.0 for value in grid["coupling_scale"]):
+            raise ValueError("coupling_scale must be positive")
 
     branches = manifest.get("branches")
     if branches != list(BRANCHES):
@@ -80,26 +109,39 @@ def expand_tasks(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     validate_manifest(manifest)
     model = manifest["model"]
     tasks: list[dict[str, Any]] = []
+    grid = manifest["grid"]
+    if "slices" in grid:
+        parameter_points = [
+            (float(row["coupling_scale"]), float(u), float(v1))
+            for row in grid["slices"]
+            for u in row["U_eV"]
+            for v1 in row["V1_eV"]
+        ]
+    else:
+        parameter_points = [
+            (float(coupling_scale), float(u), float(v1))
+            for coupling_scale in grid["coupling_scale"]
+            for u in grid["U_eV"]
+            for v1 in grid["V1_eV"]
+        ]
     for size in manifest["lattice_sizes"]:
-        for coupling_scale in manifest["grid"]["coupling_scale"]:
-            for hubbard_u in manifest["grid"]["U_eV"]:
-                for v1 in manifest["grid"]["V1_eV"]:
-                    for branch in manifest["branches"]:
-                        tasks.append(
-                            {
-                                "size": int(size),
-                                "coupling_scale": float(coupling_scale),
-                                "U_eV": float(hubbard_u),
-                                "V1_eV": float(v1),
-                                "branch": str(branch),
-                                "alpha_intra_eV_per_A": float(coupling_scale)
-                                * float(model["base_alpha_intra_eV_per_A"]),
-                                "alpha_x_eV_per_A": float(coupling_scale)
-                                * float(model["base_alpha_x_eV_per_A"]),
-                                "alpha_y_eV_per_A": float(coupling_scale)
-                                * float(model["base_alpha_y_eV_per_A"]),
-                            }
-                        )
+        for coupling_scale, hubbard_u, v1 in parameter_points:
+            for branch in manifest["branches"]:
+                tasks.append(
+                    {
+                        "size": int(size),
+                        "coupling_scale": coupling_scale,
+                        "U_eV": hubbard_u,
+                        "V1_eV": v1,
+                        "branch": str(branch),
+                        "alpha_intra_eV_per_A": coupling_scale
+                        * float(model["base_alpha_intra_eV_per_A"]),
+                        "alpha_x_eV_per_A": coupling_scale
+                        * float(model["base_alpha_x_eV_per_A"]),
+                        "alpha_y_eV_per_A": coupling_scale
+                        * float(model["base_alpha_y_eV_per_A"]),
+                    }
+                )
     return tasks
 
 
