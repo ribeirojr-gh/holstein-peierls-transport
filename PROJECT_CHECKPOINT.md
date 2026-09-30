@@ -2,7 +2,7 @@
 
 Updated: 2026-09-30  
 Branch: `s3-paper1-parameter-campaign`  
-Comparison implementation/report commit: `e235dcd`
+Current frozen midpoint-campaign commit: `db0b953`
 
 ## Current state
 
@@ -24,18 +24,18 @@ from `scripts/compare_s3_finite_size.py`.
 ## Current decision and next action
 
 The formal 20x20/40x40 comparison and explicit sampled finite-size statuses are
-complete. Because ten intervals remain too coarse for well-localized Paper-1
-transition values, the next stage is a frozen 40x40 midpoint campaign: 10 points
-and 28 branches. It is a targeted competing-root check, not a global five-seed
-search. After those results, assess whether seven new midpoint coordinates need
-20x20 counterparts before promoting size-dependent claims, then proceed to the
-Paper-1 S4 data freeze.
+complete. Ten transition brackets remain too coarse for well-localized
+Paper-1 transition values. The follow-up 40x40 midpoint campaign is frozen at
+10 points and 28 branches. It is a targeted competing-root check, not a global
+five-seed search. After those results, assess whether seven new midpoint
+coordinates need 20x20 counterparts before promoting size-dependent claims,
+then proceed to the Paper-1 S4 data freeze.
 
 ## Canonical artifacts
 
 - comparison implementation: `scripts/compare_s3_finite_size.py`;
 - comparison report: `docs/s3-paper1-bipolaron-finite-size-comparison-20260930.md`;
-- next frozen manifest:
+- frozen midpoint manifest:
   `configs/s3-paper1-bipolaron-boundary-midpoints-40x40-v1.json`;
 - midpoint campaign design:
   `docs/s3-paper1-bipolaron-boundary-midpoints-40x40-design-20260930.md`;
@@ -61,5 +61,7 @@ https://drive.google.com/drive/folders/1sLQuIJGFDZoqc9rx9CSTtz6tOEXYwp0y
 - 40x40 result report: `1dvoAJ4QGVOHib6Sk0RJPAzC8hQcMSiQn`;
 - 20x20/40x40 comparison report: `1x1_CLThljFLwYvp4aJW7SaTZURD59wYC`;
 - reproducible 20x20+40x40 comparison archive: `1qqGo1beNtPzux_FNKdOcynWUpEzT3JAv`.
+- midpoint campaign folder: `1F1HZmCa2-GRGLGIWpGKcIKPKO49liFkI`;
+- frozen midpoint manifest: `1h9z-B69AH9BqINQ0oqQXibpikZ4MSvVp`.
 
 The target folder was listed after upload and all artifacts above were visible.
