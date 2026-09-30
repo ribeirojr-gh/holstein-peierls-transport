@@ -26,7 +26,9 @@ from `scripts/compare_s3_finite_size.py`.
 The formal 20x20/40x40 comparison and explicit sampled finite-size statuses are
 complete. Ten transition brackets remain too coarse for well-localized
 Paper-1 transition values. The follow-up 40x40 midpoint campaign is frozen at
-10 points and 28 branches and is currently running locally. It is a targeted
+10 points and 28 branches and is currently running locally: 1/28 branch is
+complete, and the second (axial-y branch at g=0.9, U=0.75, V1=0.004 eV) is
+active. This is a targeted
 competing-root check, not a global five-seed search. After those results, assess
 whether seven new midpoint coordinates need 20x20 counterparts before
 promoting size-dependent claims, then proceed to the Paper-1 S4 data freeze.
@@ -41,6 +43,7 @@ promoting size-dependent claims, then proceed to the Paper-1 S4 data freeze.
   `docs/s3-paper1-bipolaron-boundary-midpoints-40x40-design-20260930.md`;
 - active local run:
   `s3-local-runs/s3-paper1-bipolaron-boundary-midpoints-40x40-v1/20260930T102438Z`;
+- first branch checkpoint archive: `1twg218VlO1hwu8cCM3qOflEpuc4sZNwj`;
 - resume command: `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
   .venv-py31214/bin/python scripts/run_s3_local_campaign.py --manifest
   configs/s3-paper1-bipolaron-boundary-midpoints-40x40-v1.json --run-dir
@@ -70,5 +73,6 @@ https://drive.google.com/drive/folders/1sLQuIJGFDZoqc9rx9CSTtz6tOEXYwp0y
 - midpoint campaign folder: `1F1HZmCa2-GRGLGIWpGKcIKPKO49liFkI`;
 - frozen midpoint manifest: `1h9z-B69AH9BqINQ0oqQXibpikZ4MSvVp`.
 - pre-run checkpoint: `1XJmnD_u5l_8KVft8tiMwRhq98WwVPbiu`.
+- running checkpoint: `1Hzrw9C9SLfMWe3u4-NpPX4n4dSnGpdWW`.
 
 The target folder was listed after upload and all artifacts above were visible.
