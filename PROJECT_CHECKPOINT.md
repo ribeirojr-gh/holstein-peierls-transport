@@ -2,7 +2,7 @@
 
 Updated: 2026-09-30  
 Branch: `s3-paper1-parameter-campaign`  
-Latest completed code/results milestone before this checkpoint: `34dac0f`
+Comparison implementation/report commit: `e235dcd`
 
 ## Current state
 
@@ -34,6 +34,7 @@ freeze (immutable tables, figures, scripts, and hashes).
 
 - comparison implementation: `scripts/compare_s3_finite_size.py`;
 - comparison report: `docs/s3-paper1-bipolaron-finite-size-comparison-20260930.md`;
+- comparison JSON/CSV outputs: under the 40x40 run directory's `comparison/`;
 - 40x40 run directory:
   `s3-local-runs/s3-paper1-bipolaron-finite-size-40x40-v1/20260928T183000Z`;
 - 20x20 run directory:
@@ -52,8 +53,8 @@ https://drive.google.com/drive/folders/1sLQuIJGFDZoqc9rx9CSTtz6tOEXYwp0y
 
 - frozen 40x40 manifest: `1CX2D-wSDc-TDcZW7OD4I9nbCfU8P7l5I`;
 - 40x40 final raw archive: `1OT04-4gbzPcf0iibnbXKLQvXj8iq3CCf`;
-- 40x40 result report: `1dvoAJ4QGVOHib6Sk0RJPAzC8hQcMSiQn`.
+- 40x40 result report: `1dvoAJ4QGVOHib6Sk0RJPAzC8hQcMSiQn`;
+- 20x20/40x40 comparison report: `1x1_CLThljFLwYvp4aJW7SaTZURD59wYC`;
+- reproducible 20x20+40x40 comparison archive: `1qqGo1beNtPzux_FNKdOcynWUpEzT3JAv`.
 
-The raw archive predates the new comparison outputs; upload a comparison
-archive and report after this checkpoint's artifacts are committed. Verify the
-Drive folder listing afterwards and update this section with the new file IDs.
+The target folder was listed after upload and all artifacts above were visible.
