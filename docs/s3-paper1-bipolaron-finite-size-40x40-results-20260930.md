@@ -35,6 +35,12 @@ onsite, axial, diagonal, and separated classifications are stable under this
 size check. This is not sufficient to promote unsampled boundaries or to claim
 global finite-size convergence.
 
+The reproducible join of the two campaign summaries marks all 16 paired points
+as `stable_at_sampled_point` and finds 10 matching sampled topology-transition
+intervals. See
+`docs/s3-paper1-bipolaron-finite-size-comparison-20260930.md`; these intervals
+remain brackets, not localized boundary values.
+
 The resulting 40x40 classification counts are:
 
 | Classification | Points |

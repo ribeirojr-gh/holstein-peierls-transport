@@ -144,3 +144,11 @@ absolute binding change was 0.2872 meV. It is explicitly a targeted finite-size
 check, not a repeat of the global five-seed topology search. Detailed results
 and limits are recorded in
 `docs/s3-paper1-bipolaron-finite-size-40x40-results-20260930.md`.
+
+The two campaign summaries are joined reproducibly by
+`scripts/compare_s3_finite_size.py`. The 16 selected points are stable at the
+sampled values and the 10 represented topology changes retain their brackets
+across sizes; the transition locations inside those brackets remain unresolved.
+Before any campaign is paused or closed, update the root `PROJECT_CHECKPOINT.md`
+with its status, provenance, stored artifacts, and next action; see
+`docs/project-checkpoint-practice.md`.
