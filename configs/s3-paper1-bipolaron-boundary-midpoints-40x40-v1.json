@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "campaign_id": "s3-paper1-bipolaron-boundary-midpoints-40x40-v1",
+  "stage": "finite_size",
+  "lattice_sizes": [40],
+  "model": {
+    "geometry": "bandwidth-matched isotropic square",
+    "boundary_conditions": "periodic",
+    "Jx_eV": 0.0575,
+    "Jy_eV": 0.0575,
+    "K1_eV_per_A2": 16.51,
+    "K2_eV_per_A2": 0.51,
+    "base_alpha_intra_eV_per_A": 3.0,
+    "base_alpha_x_eV_per_A": 0.1,
+    "base_alpha_y_eV_per_A": 0.1,
+    "coupling_scale_definition": "global multiplier applied to alpha_intra, alpha_x, and alpha_y",
+    "interaction": "onsite U plus isotropic nearest-neighbour V1",
+    "long_range_coulomb": false
+  },
+  "grid": {
+    "selection_basis": "arithmetic midpoint of each of the 10 matched 20x20/40x40 transition brackets; initialize only the competing endpoint topology seeds plus same-cell separated seed; both axial orientations retained for axial-diagonal checks",
+    "slices": [
+      {"coupling_scale": 0.9, "U_eV": [0.75], "V1_eV": [0.004], "branches": ["intersite_x", "intersite_y", "diagonal", "separated"]},
+      {"coupling_scale": 0.9, "U_eV": [0.75], "V1_eV": [0.024], "branches": ["diagonal", "separated"]},
+      {"coupling_scale": 1.0, "U_eV": [0.525], "V1_eV": [0.28], "branches": ["onsite", "separated"]},
+      {"coupling_scale": 1.0, "U_eV": [0.75], "V1_eV": [0.010], "branches": ["intersite_x", "intersite_y", "diagonal", "separated"]},
+      {"coupling_scale": 1.0, "U_eV": [0.75], "V1_eV": [0.028], "branches": ["diagonal", "separated"]},
+      {"coupling_scale": 1.0, "U_eV": [1.0], "V1_eV": [0.002], "branches": ["intersite_x", "intersite_y", "diagonal", "separated"]},
+      {"coupling_scale": 1.0, "U_eV": [1.0], "V1_eV": [0.010], "branches": ["diagonal", "separated"]},
+      {"coupling_scale": 1.1, "U_eV": [0.75], "V1_eV": [0.028], "branches": ["diagonal", "separated"]},
+      {"coupling_scale": 1.1, "U_eV": [1.0], "V1_eV": [0.004], "branches": ["intersite_x", "intersite_y", "diagonal", "separated"]},
+      {"coupling_scale": 1.1, "U_eV": [1.0], "V1_eV": [0.012], "branches": ["diagonal", "separated"]}
+    ]
+  },
+  "branches": ["onsite", "intersite_x", "intersite_y", "diagonal", "separated"],
+  "numerical": {
+    "max_iterations": 1200,
+    "coordinate_update_tolerance_A": 1e-08,
+    "gradient_tolerance_eV_per_A": 1e-06,
+    "eigensolver_tolerance": 1e-11,
+    "thread_count": 1
+  },
+  "classification": {
+    "energy_tie_tolerance_eV": 1e-08,
+    "robust_binding_threshold_eV": 0.005,
+    "linear_peierls_ratio_max": 0.25
+  },
+  "finite_size_policy": {
+    "role": "targeted 40x40 midpoint refinement of topology-transition intervals",
+    "reference_campaign": "s3-paper1-bipolaron-production-20x20-v1",
+    "interval_comparison_campaign": "s3-paper1-bipolaron-finite-size-40x40-v1",
+    "global_five_seed_search_repeated": false,
+    "competing_topology_seeds_and_separated_seed_required": true,
+    "both_axial_orientations_required_for_axial_diagonal_midpoints": true,
+    "new_midpoints_without_existing_20x20_sample_are_not_size_matched": true
+  }
+}
