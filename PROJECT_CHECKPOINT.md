@@ -2,7 +2,7 @@
 
 Updated: 2026-09-30  
 Branch: `s3-paper1-parameter-campaign`  
-Current frozen midpoint-campaign commit: `db0b953`
+Midpoint campaign frozen at `db0b953`; run started from `50097b0`
 
 ## Current state
 
@@ -26,10 +26,10 @@ from `scripts/compare_s3_finite_size.py`.
 The formal 20x20/40x40 comparison and explicit sampled finite-size statuses are
 complete. Ten transition brackets remain too coarse for well-localized
 Paper-1 transition values. The follow-up 40x40 midpoint campaign is frozen at
-10 points and 28 branches. It is a targeted competing-root check, not a global
-five-seed search. After those results, assess whether seven new midpoint
-coordinates need 20x20 counterparts before promoting size-dependent claims,
-then proceed to the Paper-1 S4 data freeze.
+10 points and 28 branches and is currently running locally. It is a targeted
+competing-root check, not a global five-seed search. After those results, assess
+whether seven new midpoint coordinates need 20x20 counterparts before
+promoting size-dependent claims, then proceed to the Paper-1 S4 data freeze.
 
 ## Canonical artifacts
 
@@ -39,6 +39,12 @@ then proceed to the Paper-1 S4 data freeze.
   `configs/s3-paper1-bipolaron-boundary-midpoints-40x40-v1.json`;
 - midpoint campaign design:
   `docs/s3-paper1-bipolaron-boundary-midpoints-40x40-design-20260930.md`;
+- active local run:
+  `s3-local-runs/s3-paper1-bipolaron-boundary-midpoints-40x40-v1/20260930T102438Z`;
+- resume command: `OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
+  .venv-py31214/bin/python scripts/run_s3_local_campaign.py --manifest
+  configs/s3-paper1-bipolaron-boundary-midpoints-40x40-v1.json --run-dir
+  s3-local-runs/s3-paper1-bipolaron-boundary-midpoints-40x40-v1/20260930T102438Z`;
 - comparison JSON/CSV outputs: under the 40x40 run directory's `comparison/`;
 - 40x40 run directory:
   `s3-local-runs/s3-paper1-bipolaron-finite-size-40x40-v1/20260928T183000Z`;
@@ -63,5 +69,6 @@ https://drive.google.com/drive/folders/1sLQuIJGFDZoqc9rx9CSTtz6tOEXYwp0y
 - reproducible 20x20+40x40 comparison archive: `1qqGo1beNtPzux_FNKdOcynWUpEzT3JAv`.
 - midpoint campaign folder: `1F1HZmCa2-GRGLGIWpGKcIKPKO49liFkI`;
 - frozen midpoint manifest: `1h9z-B69AH9BqINQ0oqQXibpikZ4MSvVp`.
+- pre-run checkpoint: `1XJmnD_u5l_8KVft8tiMwRhq98WwVPbiu`.
 
 The target folder was listed after upload and all artifacts above were visible.
